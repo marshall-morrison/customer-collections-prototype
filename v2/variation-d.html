@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Collections Agent — Meridian Group</title>
+<style>
+  :root{
+    --nav:#2d2e2b; --text:#1c1c1a; --helper:#75786f; --border:#dfdfdf;
+    --accent:#2476d8; --tint:#d3d6c2; --surface:#fff; --bg:#f2f2f0;
+    --rail-w:56px; --col:780px;
+    --green:#2f7d4f; --red:#c0392b; --amber:#b07d1e;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text); background:var(--bg); font-size:14px; line-height:1.45;
+  }
+  button{font-family:inherit; cursor:pointer}
+  /* ---------- left product rail ---------- */
+  .rail{
+    position:fixed; top:0; left:0; bottom:0; width:var(--rail-w);
+    background:var(--nav); display:flex; flex-direction:column; align-items:center;
+    padding:12px 0; gap:6px; z-index:40;
+  }
+  .rail .logo{width:30px;height:30px;border-radius:7px;background:var(--tint);
+    color:var(--nav);display:flex;align-items:center;justify-content:center;font-weight:800;margin-bottom:10px}
+  .rail .ico{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    color:#a9aaa3;font-size:16px}
+  .rail .ico.active{background:rgba(255,255,255,.12);color:#fff}
+  .rail .spacer{flex:1}
+  .rail .avatar{width:30px;height:30px;border-radius:50%;background:#52544d;color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+  /* ---------- shell ---------- */
+  .shell{margin-left:var(--rail-w);min-height:100vh}
+  /* ---------- top control bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:30; background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .topbar-inner{max-width:calc(var(--col) + 80px);margin:0 auto;padding:10px 24px}
+  .tb-row1{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .cust-name{font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .cust-dom{color:var(--helper);font-size:12px}
+  .tb-row1 .sep{color:var(--border)}
+  .tb-spacer{flex:1}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);
+    border-radius:20px;padding:3px 10px;font-size:12px;background:var(--surface);white-space:nowrap;
+  }
+  .chip b{font-weight:600}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--helper)}
+  .chip.overdue .dot{background:var(--red)} .chip.disputed .dot{background:var(--amber)}
+  .chip.current .dot{background:var(--accent)} .chip.paid .dot{background:var(--green)}
+  .chip.total{background:var(--bg);font-weight:600}
+  .levers{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .lever{
+    display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);
+    border-radius:8px;padding:5px 10px;font-size:12px;background:var(--surface);color:var(--text);
+  }
+  .lever:hover{background:var(--bg)}
+  .lever .sw{width:26px;height:15px;border-radius:9px;background:#d6d6d2;position:relative;transition:.15s;flex:none}
+  .lever .sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;transition:.15s}
+  .lever.on .sw{background:var(--accent)} .lever.on .sw::after{left:13px}
+  .lever.kill.on .sw{background:var(--red)}
+  .lever.star.on{background:#fff7e0;border-color:#e6d189;color:#8a6a14}
+  .lever.ghost{border-style:dashed}
+  .lb-learn{margin-left:auto;background:var(--text);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600}
+  .lb-learn:hover{background:#000}
+  /* ---------- reading column ---------- */
+  .col{max-width:calc(var(--col) + 80px);margin:0 auto;padding:28px 24px 120px}
+  .reading{max-width:var(--col);margin:0 auto}
+  .sec{margin-bottom:40px}
+  .sec-head{display:flex;align-items:baseline;gap:10px;margin:0 0 14px}
+  .sec-num{font-size:11px;font-weight:700;color:var(--helper);letter-spacing:.08em;
+    border:1px solid var(--border);border-radius:5px;padding:1px 6px;background:var(--surface)}
+  .sec-title{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0}
+  .sec-sub{color:var(--helper);font-size:12px;margin-left:auto}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px}
+  .pad{padding:18px}
+  /* ---------- §3 instant context ---------- */
+  .ctx-trigger{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--helper);
+    text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:10px}
+  .ctx-trigger .pulse{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  .ctx-what{font-size:16px;line-height:1.55;margin:0 0 12px}
+  .ctx-why{display:flex;gap:10px;padding:12px 14px;background:var(--bg);border-radius:9px;font-size:13.5px;margin-bottom:12px}
+  .ctx-why .k{font-weight:700;color:var(--helper);font-size:11px;text-transform:uppercase;letter-spacing:.05em;flex:none;margin-top:1px}
+  .needsyou{display:flex;gap:11px;align-items:flex-start;padding:13px 15px;border-radius:9px;
+    background:#fff7e0;border:1px solid #e6d189;font-size:13.5px}
+  .needsyou .badge{flex:none;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    background:#8a6a14;color:#fff;border-radius:5px;padding:2px 7px;margin-top:1px}
+  .ctx-facts{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+  .fact{font-size:12px;border:1px solid var(--border);border-radius:7px;padding:5px 10px;background:var(--surface)}
+  .fact b{font-weight:700}
+  .fact.red b{color:var(--red)} .fact.amber b{color:var(--amber)}
+  /* ---------- §2 proposed plan ---------- */
+  .plan-meta{font-size:13px;color:var(--helper);margin-bottom:12px}
+  .action{border:1px solid var(--border);border-radius:11px;background:var(--surface);margin-bottom:12px;overflow:hidden;transition:box-shadow .15s,border-color .15s}
+  .action.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(36,118,216,.12)}
+  .action.rejected{opacity:.55}
+  .action-bar{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:pointer}
+  .action-bar:hover{background:#fafafa}
+  .act-icon{flex:none;width:30px;height:30px;border-radius:8px;background:var(--tint);color:var(--nav);
+    display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+  .act-main{flex:1;min-width:0}
+  .act-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+  .kind-tag{font-size:10px;font-weight:600;color:var(--helper);border:1px solid var(--border);border-radius:5px;padding:1px 6px;text-transform:lowercase;letter-spacing:.03em}
+  .act-desc{color:var(--helper);font-size:13px;margin-top:2px}
+  .act-toggles{display:flex;gap:6px;flex:none;align-items:center}
+  .tg{border:1px solid var(--border);background:var(--surface);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;color:var(--helper)}
+  .tg.approve.on{background:var(--green);border-color:var(--green);color:#fff}
+  .tg.reject.on{background:var(--red);border-color:var(--red);color:#fff}
+  .act-artifact{border-top:1px solid var(--border);padding:16px;background:#fbfbfa;display:none}
+  .action.open .act-artifact{display:block}
+  .caret{flex:none;color:var(--helper);font-size:11px;transition:transform .15s;margin-top:6px}
+  .action.open .caret{transform:rotate(90deg)}
+  /* inline artifact field styling */
+  .fld{margin-bottom:11px}
+  .fld:last-child{margin-bottom:0}
+  .fld label{display:block;font-size:11px;font-weight:700;color:var(--helper);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .fld input,.fld textarea,.fld select{width:100%;border:1px solid var(--border);border-radius:7px;
+    padding:8px 10px;font-family:inherit;font-size:13px;color:var(--text);background:var(--surface)}
+  .fld textarea{resize:vertical;line-height:1.5}
+  .fld .ro{background:var(--bg)}
+  .attach{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .att{display:inline-flex;align-items:center;gap:6px;font-size:11px;border:1px solid var(--border);
+    border-radius:6px;padding:4px 9px;background:var(--surface)}
+  .att .ext{font-size:9px;font-weight:700;background:var(--text);color:#fff;border-radius:3px;padding:1px 4px}
+  .yn{display:flex;gap:8px}
+  .yn .opt{flex:1;border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;font-size:13px;font-weight:600;background:var(--surface);color:var(--helper)}
+  .yn .opt.on{border-color:var(--accent);color:var(--accent);background:#eef5fe}
+  .li-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  .li-tbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--helper);padding:5px 8px;border-bottom:1px solid var(--border)}
+  .li-tbl td{padding:6px 8px;border-bottom:1px solid var(--border)}
+  .li-tbl .rm{color:var(--red);text-decoration:line-through;opacity:.7}
+  .flag-line{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:11px}
+  .flag-line .star{color:var(--amber)}
+  .artifact-foot{margin-top:14px;display:flex;justify-content:flex-end;gap:8px}
+  .btn{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--text)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#1f66bd}
+  .open-overlay{font-size:11px;color:var(--accent);font-weight:600;margin-top:10px;background:none;border:none;padding:0}
+  /* plan footer */
+  .plan-foot{display:flex;align-items:center;gap:12px;margin-top:8px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:11px}
+  .plan-foot .summary{font-size:13px;color:var(--helper);flex:1}
+  /* handoff input */
+  .handoff{margin-top:16px;border:1px solid var(--border);border-radius:11px;background:var(--surface);padding:12px}
+  .handoff .lbl{font-size:11px;font-weight:700;color:var(--helper);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;display:flex;align-items:center;gap:7px}
+  .handoff .lbl .ai{width:18px;height:18px;border-radius:5px;background:var(--tint);color:var(--nav);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
+  .handoff-row{display:flex;gap:8px;align-items:flex-end}
+  .handoff textarea{flex:1;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:13px;resize:none;min-height:40px}
+  .handoff .send{background:var(--text);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:600;align-self:stretch}
+  /* ---------- §4 future ---------- */
+  .future-seq{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px}
+  .seq-name{font-weight:700}
+  .badge-broken{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:#fdecea;color:var(--red);border:1px solid #f3c0ba;border-radius:5px;padding:2px 7px}
+  .future-tile{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border:1px solid var(--border);border-radius:11px;background:var(--surface);margin-bottom:10px}
+  .ft-date{flex:none;text-align:center;border:1px solid var(--border);border-radius:8px;padding:6px 9px;background:var(--bg);min-width:62px}
+  .ft-date .d{font-size:14px;font-weight:700} .ft-date .t{font-size:10px;color:var(--helper)}
+  .ft-main{flex:1;min-width:0}
+  .ft-kind{font-size:10px;font-weight:700;color:var(--helper);text-transform:uppercase;letter-spacing:.05em}
+  .ft-title{font-weight:600;font-size:13.5px;margin-top:1px}
+  .ft-sub{font-size:12px;color:var(--helper);margin-top:2px}
+  .future-more{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--helper);margin-top:6px}
+  .link-btn{background:none;border:none;color:var(--accent);font-weight:600;font-size:12px;padding:0}
+  .collapsed-future{display:none}
+  .future.expanded .collapsed-future{display:block}
+  /* ---------- §1 activity log ---------- */
+  .log-filter-note{display:none;align-items:center;gap:8px;font-size:12px;background:#eef5fe;border:1px solid #bcd8f8;
+    border-radius:8px;padding:7px 11px;margin-bottom:12px;color:var(--accent)}
+  .log-filter-note.show{display:flex}
+  .log-filter-note button{margin-left:auto;background:none;border:none;color:var(--accent);font-weight:600;text-decoration:underline}
+  .logrow{display:flex;gap:13px;padding:12px 4px;border-bottom:1px solid var(--border);position:relative}
+  .logrow:last-child{border-bottom:none}
+  .logrow.clickable{cursor:pointer;border-radius:8px}
+  .logrow.clickable:hover{background:#fafafa;padding-left:8px;padding-right:8px}
+  .logrow.dimmed{opacity:.35}
+  .log-when{flex:none;width:74px;text-align:right;font-size:11px;color:var(--helper);padding-top:2px}
+  .log-when .t{display:block;font-size:10px}
+  .log-icon{flex:none;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;margin-top:1px}
+  .log-icon.email-in{background:var(--accent)} .log-icon.email-out{background:#6b6e64}
+  .log-icon.system{background:#8a6a14} .log-icon.agent{background:var(--nav)}
+  .log-icon.pay-fail{background:var(--red)} .log-icon.pay-ok{background:var(--green)}
+  .log-icon.event{background:#a9aaa3}
+  .log-body{flex:1;min-width:0}
+  .log-sender{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .log-sender .who{font-weight:600;font-size:13px}
+  .dir-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:4px;padding:1px 5px}
+  .dir-tag.received{background:#eef5fe;color:var(--accent)} .dir-tag.sent{background:var(--bg);color:var(--helper)}
+  .stat{font-size:9px;font-weight:600;color:var(--helper);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+  .inv-tag{font-size:10px;color:var(--helper);font-family:ui-monospace,Menlo,monospace}
+  .log-subject{font-size:13px;margin-top:2px}
+  .log-preview{font-size:12px;color:var(--helper);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ---------- overlay / drawer ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(28,28,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+  .scrim.show{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,92vw);background:var(--surface);
+    box-shadow:-8px 0 32px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);
+    z-index:60;display:flex;flex-direction:column}
+  .drawer.show{transform:translateX(0)}
+  .drawer-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .drawer-head .dh-title{font-weight:700;font-size:15px;flex:1}
+  .drawer-head .x{border:none;background:none;font-size:20px;color:var(--helper);line-height:1;padding:4px 8px}
+  .drawer-body{flex:1;overflow:auto;padding:20px}
+  .email-meta{font-size:13px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .email-meta .ln{display:flex;gap:8px;margin-bottom:3px}
+  .email-meta .k{color:var(--helper);width:54px;flex:none}
+  .email-body{font-size:14px;line-height:1.6;white-space:pre-wrap}
+  .thread-item{border-left:2px solid var(--border);padding:10px 0 10px 14px;margin-top:14px}
+  .thread-item .ti-h{font-size:12px;color:var(--helper);margin-bottom:5px}
+  .thread-item .ti-b{font-size:13px;white-space:pre-wrap;line-height:1.55}
+  /* ---------- modal ---------- */
+  .modal-scrim{position:fixed;inset:0;background:rgba(28,28,26,.45);display:none;align-items:center;justify-content:center;z-index:70;padding:24px}
+  .modal-scrim.show{display:flex}
+  .modal{background:var(--surface);border-radius:14px;width:min(560px,100%);max-height:88vh;overflow:auto;box-shadow:0 24px 64px rgba(0,0,0,.25)}
+  .modal-head{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .modal-head h3{margin:0;font-size:15px;flex:1}
+  .modal-head .x{border:none;background:none;font-size:20px;color:var(--helper)}
+  .modal-body{padding:20px}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+  /* ---------- learn-more deep view (full screen overlay) ---------- */
+  .deep{position:fixed;inset:0;background:var(--bg);z-index:65;overflow:auto;display:none}
+  .deep.show{display:block}
+  .deep-top{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);z-index:2}
+  .deep-top-inner{max-width:920px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:12px}
+  .deep-back{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600}
+  .deep-title{font-size:16px;font-weight:700}
+  .deep-wrap{max-width:920px;margin:0 auto;padding:24px}
+  .deep-sub{margin-bottom:26px}
+  .deep-sub h4{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--helper);margin:0 0 10px}
+  .kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kv{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
+  .kv .k{font-size:11px;color:var(--helper);text-transform:uppercase;letter-spacing:.04em}
+  .kv .v{font-size:14px;font-weight:600;margin-top:2px}
+  .inv-snap{display:flex;gap:8px;flex-wrap:wrap}
+  .inv-snap .isn{flex:1;min-width:130px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
+  .inv-snap .isn .num{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700}
+  .inv-snap .isn .amt{font-size:16px;font-weight:700;margin-top:4px}
+  .inv-snap .isn .st{font-size:11px;color:var(--helper);margin-top:2px}
+  /* discovery chat */
+  .chat{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px}
+  .chat-log{min-height:60px;font-size:13px;color:var(--helper);margin-bottom:10px}
+  .chat-msg{margin-bottom:10px}
+  .chat-msg .role{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--helper)}
+  .chat-msg.user .role{color:var(--accent)}
+  .chat-msg .txt{font-size:13.5px;color:var(--text);margin-top:2px}
+  .chat-examples{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .ex{font-size:12px;border:1px solid var(--border);border-radius:16px;padding:4px 11px;background:var(--bg);color:var(--text)}
+  .ex:hover{border-color:var(--accent);color:var(--accent)}
+  .chat-row{display:flex;gap:8px}
+  .chat-row input{flex:1;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:13px}
+  /* ---------- action artifact gallery (accordion) ---------- */
+  .gallery-toggle{width:100%;text-align:left;display:flex;align-items:center;gap:10px;background:var(--surface);
+    border:1px solid var(--border);border-radius:11px;padding:14px 16px;font-size:14px;font-weight:700}
+  .gallery-toggle .caret2{margin-left:auto;color:var(--helper);transition:transform .15s}
+  .gallery.open .gallery-toggle .caret2{transform:rotate(90deg)}
+  .gallery-body{display:none;margin-top:12px}
+  .gallery.open .gallery-body{display:block}
+  .gitem{border:1px solid var(--border);border-radius:11px;background:var(--surface);margin-bottom:10px;overflow:hidden}
+  .gitem-bar{display:flex;align-items:center;gap:11px;padding:13px 15px;cursor:pointer}
+  .gitem-bar:hover{background:#fafafa}
+  .gitem-bar .gt{font-weight:600;font-size:13.5px}
+  .gitem-bar .gp{font-size:11px;color:var(--helper);margin-left:auto;border:1px solid var(--border);border-radius:5px;padding:2px 7px}
+  .gitem-art{display:none;border-top:1px solid var(--border);padding:15px;background:#fbfbfa}
+  .gitem.open .gitem-art{display:block}
+  .corner{position:fixed;right:14px;bottom:14px;z-index:80;background:var(--nav);color:#fff;
+    border-radius:8px;padding:7px 12px;font-size:11px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .corner b{color:var(--tint)}
+  .mono{font-family:ui-monospace,Menlo,monospace}
+</style>
+</head>
+<body>
+
+<!-- ============ LEFT PRODUCT RAIL ============ -->
+<nav class="rail" aria-label="Product navigation">
+  <div class="logo">T</div>
+  <div class="ico">▤</div>
+  <div class="ico">◴</div>
+  <div class="ico active" title="Collections">◎</div>
+  <div class="ico">⊞</div>
+  <div class="ico">⎙</div>
+  <div class="spacer"></div>
+  <div class="ico">⚙</div>
+  <div class="avatar">MM</div>
+</nav>
+
+<div class="shell">
+
+  <!-- ============ TOP CONTROL BAR (§7 control panel) ============ -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="tb-row1">
+        <span class="cust-name" id="custName"></span>
+        <span class="cust-dom" id="custDom"></span>
+        <span class="tb-spacer"></span>
+        <button class="lb-learn" id="learnMoreBtn">Learn more about this customer →</button>
+      </div>
+      <div class="chips" id="invChips"></div>
+      <div class="levers" id="levers">
+        <button class="lever kill" id="leverAgent">
+          <span class="sw"></span><span>Pause agent <span style="color:var(--helper)">(kill switch)</span></span>
+        </button>
+        <button class="lever" id="leverDunning">
+          <span class="sw"></span><span>Pause dunning <span style="color:var(--helper)">(hold → pending)</span></span>
+        </button>
+        <button class="lever star" id="leverStar">★ <span>Escalation flag</span></button>
+        <button class="lever ghost" id="btnPermissions">⚖ Permissions / policy</button>
+        <button class="lever ghost" id="btnOneOff">✉ Send one-off email</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ READING COLUMN ============ -->
+  <main class="col">
+    <div class="reading">
+
+      <!-- §3 INSTANT CONTEXT -->
+      <section class="sec" id="secContext">
+        <div class="sec-head">
+          <span class="sec-num">01 · CONTEXT</span>
+          <h2 class="sec-title">Here's the situation</h2>
+        </div>
+        <div class="card pad">
+          <div class="ctx-trigger"><span class="pulse"></span><span id="ctxTrigger"></span></div>
+          <p class="ctx-what" id="ctxWhat"></p>
+          <div class="ctx-why"><span class="k">Why this plan</span><span id="ctxWhy"></span></div>
+          <div id="ctxNeedsYou"></div>
+          <div class="ctx-facts" id="ctxFacts"></div>
+        </div>
+      </section>
+
+      <!-- §2 PROPOSED PLAN + §6A HANDOFF -->
+      <section class="sec" id="secPlan">
+        <div class="sec-head">
+          <span class="sec-num">02 · PLAN</span>
+          <h2 class="sec-title">Here's the plan</h2>
+          <span class="sec-sub" id="planMeta"></span>
+        </div>
+        <div class="plan-meta">Review each step. Approve to keep it, reject to drop it. Click a step to edit its artifact inline, or open it in the work drawer.</div>
+        <div id="planActions"></div>
+        <div class="plan-foot">
+          <span class="summary" id="planSummary"></span>
+          <button class="btn primary" id="approveAll">Approve all & run</button>
+        </div>
+
+        <!-- §6A work-handoff input, pinned near the plan -->
+        <div class="handoff">
+          <div class="lbl"><span class="ai">AI</span> Hand the agent more work</div>
+          <div class="handoff-row">
+            <textarea id="handoffInput" rows="1"></textarea>
+            <button class="send">Send to agent</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- §4 FUTURE SCHEDULED -->
+      <section class="sec future" id="secFuture">
+        <div class="sec-head">
+          <span class="sec-num">03 · NEXT</span>
+          <h2 class="sec-title">Here's what's coming</h2>
+        </div>
+        <div class="future-seq" id="futureSeq"></div>
+        <div id="futureNext"></div>
+        <div class="collapsed-future" id="futureRest"></div>
+        <div class="future-more">
+          <span id="futureCount"></span>
+          <button class="link-btn" id="futureToggle">See all in settings →</button>
+        </div>
+      </section>
+
+      <!-- ACTION ARTIFACT GALLERY (accordion) -->
+      <section class="sec gallery" id="gallery">
+        <button class="gallery-toggle" id="galleryToggle">
+          <span>⊞ Action artifacts</span>
+          <span style="font-weight:400;color:var(--helper);font-size:12px">every action flavor the agent can propose</span>
+          <span class="caret2">▸</span>
+        </button>
+        <div class="gallery-body" id="galleryBody"></div>
+      </section>
+
+      <!-- §1 ACTIVITY LOG -->
+      <section class="sec" id="secLog">
+        <div class="sec-head">
+          <span class="sec-num">04 · HISTORY</span>
+          <h2 class="sec-title">Here's what happened</h2>
+        </div>
+        <div class="log-filter-note" id="logFilter">
+          <span id="logFilterText"></span>
+          <button id="logFilterClear">Clear filter</button>
+        </div>
+        <div class="card pad" id="activityLog"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ============ DRAWER (work area §5) ============ -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="dh-title" id="drawerTitle"></span>
+    <button class="x" id="drawerClose">×</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<!-- ============ MODAL (one-off / permissions) ============ -->
+<div class="modal-scrim" id="modalScrim">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle"></h3><button class="x" id="modalClose">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<!-- ============ LEARN-MORE DEEP VIEW (§7) ============ -->
+<div class="deep" id="deep">
+  <div class="deep-top">
+    <div class="deep-top-inner">
+      <button class="deep-back" id="deepBack">← Back to agent</button>
+      <span class="deep-title" id="deepTitle"></span>
+    </div>
+  </div>
+  <div class="deep-wrap" id="deepWrap"></div>
+</div>
+
+<div class="corner">D — <b>Single reading column</b></div>
+
+<script src="shared/mock.js"></script>
+<script>
+(function(){
+  "use strict";
+  var M = window.MOCK;
+  var $ = function(id){return document.getElementById(id);};
+  var esc = function(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;};
+  var nl2br = function(s){return esc(s).replace(/\n/g,'<br>');};
+
+  /* ---------- helpers for sender labels ---------- */
+  function senderLabel(e){
+    if(e.senderType==='customer') return (e.senderName||'')+' – '+(e.org||M.customer.name);
+    if(e.senderType==='system') return 'System · '+(e.systemKind==='dunning'?'Dunning':(e.systemKind||''));
+    if(e.senderType==='agent') return 'Agent';
+    return e.senderName||'Merchant';
+  }
+  function statusBadges(flags){
+    if(!flags) return '';
+    var out=[];
+    if(flags.opened) out.push('<span class="stat">Opened</span>');
+    if(flags.clicked) out.push('<span class="stat">Link clicked</span>');
+    return out.join('');
+  }
+
+  /* ---------- §7 control bar ---------- */
+  $('custName').textContent = M.customer.name;
+  $('custDom').textContent = M.customer.domain;
+
+  function renderChips(){
+    var c = $('invChips'); c.innerHTML='';
+    var t = document.createElement('span');
+    t.className='chip total';
+    t.innerHTML='Outstanding <b>'+esc(M.totals.outstanding)+'</b> · Overdue <b style="color:var(--red)">'+esc(M.totals.overdue)+'</b>';
+    c.appendChild(t);
+    M.invoices.forEach(function(inv){
+      var el=document.createElement('span');
+      el.className='chip '+inv.status;
+      var od = inv.daysOverdue>0 ? ' · '+inv.daysOverdue+'d' : '';
+      el.innerHTML='<span class="dot"></span><span class="mono">'+esc(inv.number)+'</span> <b>'+esc(inv.amount)+'</b> '
+        +'<span style="color:var(--helper);text-transform:capitalize">'+esc(inv.status)+od+'</span>';
+      c.appendChild(el);
+    });
+  }
+  renderChips();
+
+  // levers initial state
+  if(M.controls.agentPaused) $('leverAgent').classList.add('on');
+  if(M.controls.dunningPaused) $('leverDunning').classList.add('on');
+  if(M.controls.escalated) $('leverStar').classList.add('on');
+
+  $('leverAgent').onclick=function(){this.classList.toggle('on');};
+  $('leverDunning').onclick=function(){
+    this.classList.toggle('on');
+    // pausing dunning "holds + moves to pending" — surface a hint
+    if(this.classList.contains('on')) toast('Dunning paused — affected invoices moved to Pending.');
+    else toast('Dunning resumed.');
+  };
+  $('leverStar').onclick=function(){this.classList.toggle('on');};
+
+  /* ---------- §3 instant context ---------- */
+  var ic = M.instantContext;
+  $('ctxTrigger').textContent = ic.trigger;
+  $('ctxWhat').textContent = ic.whatHappened;
+  $('ctxWhy').textContent = ic.why;
+  if(ic.needsYou){
+    var ny=ic.needsYou;
+    var label = {cannot_execute:'Can’t execute',policy_review:'Policy review',needs_judgment:'Needs your judgment'}[ny.type]||'Needs you';
+    $('ctxNeedsYou').innerHTML='<div class="needsyou"><span class="badge">'+esc(label)+'</span><span>'+esc(ny.text)+'</span></div>';
+  }
+  // fact chips from invoices/totals
+  (function(){
+    var f=$('ctxFacts');
+    var od = M.invoices.filter(function(i){return i.status==='overdue';})[0];
+    var dp = M.invoices.filter(function(i){return i.status==='disputed';})[0];
+    var chips=[
+      {t:'Outstanding',v:M.totals.outstanding},
+      {t:'Overdue',v:M.totals.overdue,c:'red'},
+    ];
+    if(od) chips.push({t:od.number,v:od.amount+' · '+od.daysOverdue+'d late',c:'red'});
+    if(dp) chips.push({t:dp.number,v:dp.amount+' · disputed',c:'amber'});
+    f.innerHTML = chips.map(function(c){
+      return '<span class="fact '+(c.c||'')+'">'+esc(c.t)+' <b>'+esc(c.v)+'</b></span>';
+    }).join('');
+  })();
+
+  /* ---------- artifact renderers (shared by plan inline, gallery, drawer) ---------- */
+  function fldInput(label,val,ro){
+    return '<div class="fld"><label>'+esc(label)+'</label><input value="'+esc(val)+'" '+(ro?'readonly class="ro"':'')+'></div>';
+  }
+  function renderArtifact(kind, a){
+    if(!a) return '<div style="color:var(--helper);font-size:13px">No artifact.</div>';
+    switch(kind){
+      case 'send_email':
+        return ''
+          + fldInput('To',(a.to||[]).join(', '))
+          + fldInput('Cc',(a.cc||[]).join(', '))
+          + fldInput('Subject',a.subject)
+          + '<div class="fld"><label>Body</label><textarea rows="7">'+esc(a.body)+'</textarea></div>'
+          + (a.attachments&&a.attachments.length ? '<div class="fld"><label>Attachments</label><div class="attach">'
+              + a.attachments.map(function(at){return '<span class="att"><span class="ext">'+esc(at.type)+'</span>'+esc(at.name)+'</span>';}).join('')
+              + '</div></div>' : '');
+      case 'schedule_task':
+        return fldInput('Run at',a.runAt)
+          + '<div class="fld"><label>Prompt</label><textarea rows="3">'+esc(a.prompt)+'</textarea></div>';
+      case 'update_po':
+        return fldInput('Invoice',a.invoice,true)+fldInput('PO number',a.poNumber);
+      case 'mark_pending':
+        return (a.note?'<div class="fld"><label>Note</label><textarea rows="2">'+esc(a.note)+'</textarea></div>':'')
+          + '<div class="fld"><label>Hold reminders & mark pending?</label><div class="yn">'
+          + '<div class="opt'+(a.confirm?' on':'')+'">Yes, mark pending</div>'
+          + '<div class="opt'+(!a.confirm?' on':'')+'">No</div></div></div>';
+      case 'update_customer':
+        return fldInput('Primary contact name',(a.primaryContact||{}).name)
+          + fldInput('Primary contact email',(a.primaryContact||{}).email)
+          + fldInput('CC contacts',(a.ccContacts||[]).join(', '))
+          + fldInput('Billing address',a.billingAddress)
+          + fldInput('Shipping address',a.shippingAddress||'');
+      case 'match_transactions':
+        return fldInput('Transaction',a.transactionId,true)
+          + fldInput('Amount',a.amount,true)
+          + fldInput('Match to invoice',a.invoice)
+          + '<div class="fld"><label>Confirm match?</label><div class="yn">'
+          + '<div class="opt on">Yes, apply</div><div class="opt">No</div></div></div>';
+      case 'billing_invoice_update':
+        var rows=(a.lineItems||[]).map(function(li){
+          var rm = /removed/i.test(li.desc);
+          return '<tr'+(rm?' class="rm"':'')+'><td>'+esc(li.desc)+'</td><td>'+esc(li.qty)+'</td><td>'+esc(li.unitPrice)+'</td><td>'+esc(li.amount)+'</td></tr>';
+        }).join('');
+        return fldInput('Invoice',a.invoice,true)
+          + '<div class="fld"><label>Line items</label><table class="li-tbl"><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+          + '<div style="display:flex;gap:10px">'+fldInput('Issue date',a.issueDate)+fldInput('Due date',a.dueDate)+'</div>';
+      case 'escalate':
+        return '<div class="flag-line"><span class="star">★</span><b>'+esc(a.escType)+'</b></div>'
+          + '<div class="fld"><label>Reason / routing note</label><textarea rows="3">'+esc(a.reason)+'</textarea></div>';
+      case 'apply_credit_memo':
+        return fldInput('Invoice',a.invoice,true)
+          + fldInput('Credit amount',a.amount)
+          + '<div class="fld"><label>Reason</label><textarea rows="2">'+esc(a.reason)+'</textarea></div>';
+      default:
+        return '<pre style="font-size:12px;white-space:pre-wrap">'+esc(JSON.stringify(a,null,2))+'</pre>';
+    }
+  }
+  var KIND_ICON={send_email:'✉',mark_pending:'⏸',schedule_task:'⏰',escalate:'★',
+    update_po:'#',update_customer:'◑',match_transactions:'⇄',billing_invoice_update:'▤',apply_credit_memo:'＄'};
+
+  /* ---------- §2 proposed plan ---------- */
+  var plan = M.proposedPlan;
+  $('planMeta').textContent = plan.count+' actions';
+  // approval state per index: 'approve' default
+  var approvals = plan.actions.map(function(){return 'approve';});
+
+  function renderPlan(){
+    var wrap=$('planActions'); wrap.innerHTML='';
+    plan.actions.forEach(function(act,i){
+      var el=document.createElement('div');
+      el.className='action'+(approvals[i]==='reject'?' rejected':'');
+      el.dataset.i=i;
+      el.innerHTML=''
+        + '<div class="action-bar">'
+        +   '<span class="act-icon">'+(KIND_ICON[act.kind]||'•')+'</span>'
+        +   '<div class="act-main">'
+        +     '<div class="act-title">'+esc(act.title)+' <span class="kind-tag">'+esc(act.kind)+'</span>'
+              + (act.invoice?' <span class="inv-tag mono">'+esc(act.invoice)+'</span>':'')+'</div>'
+        +     '<div class="act-desc">'+esc(act.desc)+'</div>'
+        +   '</div>'
+        +   '<div class="act-toggles">'
+        +     '<button class="tg approve'+(approvals[i]==='approve'?' on':'')+'" data-app="approve" data-i="'+i+'">Approve</button>'
+        +     '<button class="tg reject'+(approvals[i]==='reject'?' on':'')+'" data-app="reject" data-i="'+i+'">Reject</button>'
+        +   '</div>'
+        +   '<span class="caret">▸</span>'
+        + '</div>'
+        + '<div class="act-artifact">'
+        +    renderArtifact(act.kind, act.artifact)
+        +    '<button class="open-overlay" data-open="'+i+'">↗ Open in work drawer</button>'
+        +    '<div class="artifact-foot"><button class="btn">Discard edits</button><button class="btn primary">Save changes</button></div>'
+        + '</div>';
+      wrap.appendChild(el);
+
+      // expand on bar click (but not when clicking toggles)
+      el.querySelector('.action-bar').addEventListener('click',function(ev){
+        if(ev.target.closest('.act-toggles')) return;
+        el.classList.toggle('open');
+        // selecting an action highlights + filters activity log to that invoice
+        selectAction(i);
+      });
+    });
+    // toggle buttons
+    wrap.querySelectorAll('.tg').forEach(function(b){
+      b.addEventListener('click',function(ev){
+        ev.stopPropagation();
+        var i=+b.dataset.i;
+        approvals[i]=b.dataset.app;
+        renderPlan(); updatePlanSummary();
+      });
+    });
+    // open-in-drawer
+    wrap.querySelectorAll('[data-open]').forEach(function(b){
+      b.addEventListener('click',function(ev){
+        ev.stopPropagation();
+        openActionDrawer(+b.dataset.open);
+      });
+    });
+    updatePlanSummary();
+  }
+  function updatePlanSummary(){
+    var a=approvals.filter(function(x){return x==='approve';}).length;
+    var r=approvals.length-a;
+    $('planSummary').textContent = a+' approved · '+r+' rejected — these run on approve; rejected steps are dropped.';
+  }
+  var selectedAction=null;
+  function selectAction(i){
+    selectedAction=i;
+    document.querySelectorAll('.action').forEach(function(el){
+      el.classList.toggle('sel', +el.dataset.i===i && el.classList.contains('open'));
+    });
+    var act=plan.actions[i];
+    if(act.invoice && document.querySelector('.action[data-i="'+i+'"]').classList.contains('open')){
+      filterLog(act.invoice, act.title);
+    } else {
+      clearLogFilter();
+    }
+  }
+  renderPlan();
+
+  $('approveAll').onclick=function(){
+    approvals=approvals.map(function(){return 'approve';});
+    renderPlan();
+    toast('All approved actions queued to run.');
+  };
+
+  /* ---------- §4 future ---------- */
+  (function(){
+    var seq=M.sequence;
+    $('futureSeq').innerHTML='<span style="color:var(--helper)">Sequence</span> <span class="seq-name">'+esc(seq.name)+'</span>'
+      + (seq.broken?'<span class="badge-broken">Broken</span>':'')
+      + (seq.broken?'<span style="color:var(--helper);font-size:12px">'+esc(seq.brokenReason)+'</span>':'');
+
+    var sorted=M.future.slice(); // already chronological in mock
+    function tile(f){
+      var title,kindLabel,sub;
+      if(f.kind==='planned_email'){kindLabel='Planned email';title=f.subject;sub='To '+f.to+(f.sequenceStep?' · '+f.sequenceStep:'')+(f.anchor?' · '+f.anchor:'');}
+      else {kindLabel='Scheduled task';title=f.prompt;sub=(f.invoice?f.invoice+' · ':'')+'agent re-check';}
+      return '<div class="future-tile"><div class="ft-date"><div class="d">'+esc(f.date.replace(/,.*/,'').replace(/^\w+ /,''))+'</div><div class="t">'+esc(f.time)+'</div></div>'
+        + '<div class="ft-main"><div class="ft-kind">'+kindLabel+(f.invoice?' · <span class="mono">'+esc(f.invoice)+'</span>':'')+'</div>'
+        + '<div class="ft-title">'+esc(title)+'</div><div class="ft-sub">'+esc(sub)+'</div></div></div>';
+    }
+    $('futureNext').innerHTML = tile(sorted[0]);
+    $('futureRest').innerHTML = sorted.slice(1).map(tile).join('');
+    $('futureCount').textContent = sorted.length+' scheduled items · showing next';
+  })();
+  $('futureToggle').onclick=function(){
+    var s=$('secFuture');
+    s.classList.toggle('expanded');
+    this.textContent = s.classList.contains('expanded')?'Collapse ←':'See all in settings →';
+    $('futureCount').textContent = s.classList.contains('expanded')
+      ? M.future.length+' scheduled items · showing all'
+      : M.future.length+' scheduled items · showing next';
+  };
+
+  /* ---------- §1 activity log ---------- */
+  function renderLog(){
+    var log=$('activityLog'); log.innerHTML='';
+    M.happened.forEach(function(e,idx){
+      var clickable = e.kind==='email';
+      var row=document.createElement('div');
+      row.className='logrow'+(clickable?' clickable':'');
+      row.dataset.idx=idx;
+      if(e.invoice) row.dataset.invoice=e.invoice;
+
+      var icon, who, dir='', subj='', preview='', badges='';
+      if(e.kind==='email'){
+        var inb = e.direction==='in';
+        icon='<span class="log-icon '+(inb?'email-in':(e.senderType==='system'?'system':(e.senderType==='agent'?'agent':'email-out')))+'">✉</span>';
+        who=senderLabel(e);
+        dir='<span class="dir-tag '+(inb?'received':'sent')+'">'+(inb?'Received':'Sent')+'</span>';
+        subj='<div class="log-subject">'+esc(e.subject)+'</div>';
+        preview='<div class="log-preview">'+esc(e.preview)+'</div>';
+        badges=statusBadges(e.flags);
+      } else if(e.kind==='payment_failed'){
+        icon='<span class="log-icon pay-fail">!</span>';
+        who='Payment failed';
+        subj='<div class="log-subject">'+esc(e.amount)+' — '+esc(e.reasonCode)+' '+esc(e.reasonText)+'</div>';
+      } else if(e.kind==='payment_applied'){
+        icon='<span class="log-icon pay-ok">✓</span>';
+        who='Payment applied';
+        subj='<div class="log-subject">'+esc(e.amount)+' — '+esc(e.details)+'</div>';
+      } else if(e.kind==='ptp_logged'){
+        icon='<span class="log-icon event">◷</span>'; who='Promise to pay logged';
+        subj='<div class="log-subject">'+esc(e.details)+'</div>';
+      } else if(e.kind==='agent_executed'){
+        icon='<span class="log-icon agent">⚙</span>'; who='Agent';
+        subj='<div class="log-subject">'+esc(e.action)+'</div><div class="log-preview">'+esc(e.details)+'</div>';
+      } else if(e.kind==='invoice_overdue'){
+        icon='<span class="log-icon event">⚑</span>'; who='Invoice overdue';
+        subj='<div class="log-subject">'+esc(e.amount)+' — '+esc(e.details)+'</div>';
+      } else {
+        icon='<span class="log-icon event">•</span>'; who=e.kind;
+      }
+
+      row.innerHTML=''
+        + '<div class="log-when">'+esc(e.date.replace(/, \d{4}/,''))+'<span class="t">'+esc(e.time||'')+'</span></div>'
+        + icon
+        + '<div class="log-body"><div class="log-sender"><span class="who">'+esc(who)+'</span>'+dir+badges
+          + (e.invoice?'<span class="inv-tag mono">'+esc(e.invoice)+'</span>':'')+'</div>'
+          + subj + preview + '</div>';
+      log.appendChild(row);
+
+      if(clickable){
+        row.addEventListener('click',function(){ openEmailDrawer(idx); });
+      }
+    });
+  }
+  renderLog();
+
+  function filterLog(invoice, label){
+    $('logFilter').classList.add('show');
+    $('logFilterText').textContent='Highlighting activity for '+label+' ('+invoice+')';
+    document.querySelectorAll('#activityLog .logrow').forEach(function(r){
+      r.classList.toggle('dimmed', r.dataset.invoice!==invoice);
+    });
+    $('secLog').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function clearLogFilter(){
+    $('logFilter').classList.remove('show');
+    document.querySelectorAll('#activityLog .logrow').forEach(function(r){r.classList.remove('dimmed');});
+  }
+  $('logFilterClear').onclick=function(){ clearLogFilter(); };
+
+  /* ---------- DRAWER (work area §5) ---------- */
+  var scrim=$('scrim'), drawer=$('drawer');
+  function openDrawer(title, html){
+    $('drawerTitle').textContent=title;
+    $('drawerBody').innerHTML=html;
+    scrim.classList.add('show'); drawer.classList.add('show');
+    drawer.setAttribute('aria-hidden','false');
+  }
+  function closeDrawer(){
+    scrim.classList.remove('show'); drawer.classList.remove('show');
+    drawer.setAttribute('aria-hidden','true');
+  }
+  $('drawerClose').onclick=closeDrawer;
+  scrim.onclick=closeDrawer;
+
+  function openEmailDrawer(idx){
+    var e=M.happened[idx];
+    // build a simple thread: this email + prior emails on the same invoice (older)
+    var thread = M.happened.filter(function(x,j){return x.kind==='email' && x.invoice===e.invoice && j>idx;});
+    var html=''
+      + '<div class="email-meta">'
+      +   '<div class="ln"><span class="k">From</span><span>'+esc(senderLabel(e))+(e.direction==='in'?'':' (sent)')+'</span></div>'
+      +   '<div class="ln"><span class="k">Subject</span><span>'+esc(e.subject)+'</span></div>'
+      +   '<div class="ln"><span class="k">When</span><span>'+esc(e.date)+' · '+esc(e.time)+'</span></div>'
+      +   (e.invoice?'<div class="ln"><span class="k">Invoice</span><span class="mono">'+esc(e.invoice)+'</span></div>':'')
+      +   (statusBadges(e.flags)?'<div class="ln"><span class="k">Status</span><span>'+statusBadges(e.flags)+'</span></div>':'')
+      + '</div>'
+      + '<div class="email-body">'+nl2br(e.body)+'</div>'
+      + (thread.length?'<div style="margin-top:18px;font-size:11px;font-weight:700;color:var(--helper);text-transform:uppercase;letter-spacing:.05em">Earlier in thread</div>':'')
+      + thread.map(function(t){
+          return '<div class="thread-item"><div class="ti-h">'+esc(senderLabel(t))+' · '+esc(t.date)+' · '+esc(t.subject)+'</div><div class="ti-b">'+nl2br(t.body)+'</div></div>';
+        }).join('');
+    openDrawer('Email · read-only', html);
+  }
+
+  function openActionDrawer(i){
+    var act=plan.actions[i];
+    var html=''
+      + '<div style="font-size:12px;color:var(--helper);margin-bottom:4px">'+esc(act.kind)+(act.invoice?' · '+esc(act.invoice):'')+'</div>'
+      + '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+esc(act.title)+'</div>'
+      + '<div style="font-size:13px;color:var(--helper);margin-bottom:16px">'+esc(act.desc)+'</div>'
+      + renderArtifact(act.kind, act.artifact)
+      + '<div class="artifact-foot" style="margin-top:18px"><button class="btn" id="dwReject">Reject</button><button class="btn primary" id="dwSave">Approve & save</button></div>';
+    openDrawer('Edit action — work drawer', html);
+    var sv=$('dwSave'); if(sv) sv.onclick=function(){approvals[i]='approve';renderPlan();closeDrawer();toast('Action saved & approved.');};
+    var rj=$('dwReject'); if(rj) rj.onclick=function(){approvals[i]='reject';renderPlan();closeDrawer();};
+  }
+
+  /* ---------- ACTION ARTIFACT GALLERY ---------- */
+  (function(){
+    var body=$('galleryBody');
+    M.actionCatalog.forEach(function(item,i){
+      var el=document.createElement('div');
+      el.className='gitem';
+      el.innerHTML=''
+        + '<div class="gitem-bar"><span class="act-icon" style="width:26px;height:26px;font-size:13px">'+(KIND_ICON[item.kind]||'•')+'</span>'
+        +   '<span class="gt">'+esc(item.title)+'</span>'
+        +   '<span class="gp">'+esc(item.uiPattern)+'</span><span class="caret" style="margin-left:8px">▸</span></div>'
+        + '<div class="gitem-art">'+renderArtifact(item.kind,item.artifact)+'</div>';
+      body.appendChild(el);
+      el.querySelector('.gitem-bar').addEventListener('click',function(){el.classList.toggle('open');});
+    });
+  })();
+  $('galleryToggle').onclick=function(){ $('gallery').classList.toggle('open'); };
+
+  /* ---------- MODALS (one-off email + permissions) ---------- */
+  var modalScrim=$('modalScrim');
+  function openModal(title, body, foot){
+    $('modalTitle').textContent=title;
+    $('modalBody').innerHTML=body;
+    $('modalFoot').innerHTML=foot||'';
+    modalScrim.classList.add('show');
+  }
+  function closeModal(){ modalScrim.classList.remove('show'); }
+  $('modalClose').onclick=closeModal;
+  modalScrim.addEventListener('click',function(e){ if(e.target===modalScrim) closeModal(); });
+
+  $('btnOneOff').onclick=function(){
+    openModal('Send one-off email',
+      fldInput('To','finance@'+M.customer.domain)
+      + fldInput('Cc','')
+      + fldInput('Subject','')
+      + '<div class="fld"><label>Body</label><textarea rows="6"></textarea></div>'
+      + '<div style="font-size:12px;color:var(--helper)">One-off emails are sent outside the agent\'s sequence and logged to the activity log.</div>',
+      '<button class="btn" id="ooCancel">Cancel</button><button class="btn primary" id="ooSend">Send email</button>');
+    $('ooCancel').onclick=closeModal;
+    $('ooSend').onclick=function(){closeModal();toast('One-off email sent & logged.');};
+  };
+  $('btnPermissions').onclick=function(){
+    openModal('Permissions & policy',
+      '<div style="font-size:13px;color:var(--helper);margin-bottom:14px">What the agent may do for '+esc(M.customer.name)+' without your approval.</div>'
+      + permRow('Send dunning emails in-sequence', true)
+      + permRow('Reply to inbound customer emails', false)
+      + permRow('Pause dunning / mark pending', true)
+      + permRow('Apply credit memos', false)
+      + permRow('Edit invoices / line items', false)
+      + permRow('Escalate to account owner', true),
+      '<button class="btn" id="pmClose2">Close</button><button class="btn primary" id="pmSave">Save policy</button>');
+    $('pmClose2').onclick=closeModal;
+    $('pmSave').onclick=function(){closeModal();toast('Policy updated.');};
+    $('modalBody').querySelectorAll('.lever').forEach(function(l){l.onclick=function(){l.classList.toggle('on');};});
+  };
+  function permRow(label,on){
+    return '<button class="lever'+(on?' on':'')+'" style="width:100%;justify-content:flex-start;margin-bottom:7px"><span class="sw"></span><span>'+esc(label)+'</span></button>';
+  }
+
+  /* ---------- LEARN-MORE DEEP VIEW (§7) ---------- */
+  $('learnMoreBtn').onclick=openDeep;
+  $('deepBack').onclick=function(){ $('deep').classList.remove('show'); };
+  function openDeep(){
+    $('deepTitle').textContent=M.customer.name+' — customer detail';
+    var ci=M.customerInsights;
+    var w=$('deepWrap');
+    // 1. drilled invoice snapshot
+    var snap='<div class="inv-snap">'+M.invoices.map(function(inv){
+      return '<div class="isn"><div class="num">'+esc(inv.number)+'</div><div class="amt">'+esc(inv.amount)+'</div>'
+        + '<div class="st" style="text-transform:capitalize">'+esc(inv.status)+(inv.daysOverdue>0?' · '+inv.daysOverdue+'d late':'')+'</div></div>';
+    }).join('')+'</div>';
+    // 2. insights kanban + reports
+    var kan=ci.fromKanban.map(function(k){return kvCard(k.label,k.value);}).join('');
+    var rep=ci.fromReports.map(function(k){return kvCard(k.label,k.value);}).join('');
+    // 4. company info
+    var co=ci.companyInfo;
+    var coCards=[
+      ['Legal name',co.legalName],['Tax',co.tax],['Address',co.address],
+      ['Terms',co.terms],['Primary contact',co.primaryContact]
+    ].map(function(r){return kvCard(r[0],r[1]);}).join('');
+
+    w.innerHTML=''
+      + '<div class="deep-sub"><h4>Invoice snapshot</h4>'+snap+'</div>'
+      + '<div class="deep-sub"><h4>Behavioral insights (from collections board)</h4><div class="kv-grid">'+kan+'</div></div>'
+      + '<div class="deep-sub"><h4>Financials (from reports)</h4><div class="kv-grid">'+rep+'</div></div>'
+      + '<div class="deep-sub"><h4>Ask the agent about this customer</h4>'+chatHtml()+'</div>'
+      + '<div class="deep-sub"><h4>Company info</h4><div class="kv-grid">'+coCards+'</div></div>';
+    wireChat();
+    $('deep').classList.add('show');
+    $('deep').scrollTop=0;
+  }
+  function kvCard(k,v){ return '<div class="kv"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div></div>'; }
+  function chatHtml(){
+    return '<div class="chat"><div class="chat-log" id="chatLog">'
+      + '<div style="font-size:13px;color:var(--helper)">Ask anything about '+esc(M.customer.name)+'’s history. The agent answers from the timeline + reports.</div></div>'
+      + '<div class="chat-examples">'+M.nl.discoveryExamples.map(function(q){return '<button class="ex">'+esc(q)+'</button>';}).join('')+'</div>'
+      + '<div class="chat-row"><input id="chatInput" placeholder="Ask a question…"><button class="btn primary" id="chatSend">Ask</button></div></div>';
+  }
+  function wireChat(){
+    var log=$('chatLog'), input=$('chatInput');
+    function ask(q){
+      if(!q) return;
+      var um=document.createElement('div'); um.className='chat-msg user';
+      um.innerHTML='<div class="role">You</div><div class="txt">'+esc(q)+'</div>'; log.appendChild(um);
+      var am=document.createElement('div'); am.className='chat-msg agent';
+      am.innerHTML='<div class="role">Agent</div><div class="txt">Looking across the activity log and reports for '+esc(M.customer.name)+'… (demo response)</div>';
+      log.appendChild(am); log.scrollTop=log.scrollHeight; input.value='';
+    }
+    $('chatSend').onclick=function(){ask(input.value.trim());};
+    input.addEventListener('keydown',function(e){if(e.key==='Enter')ask(input.value.trim());});
+    document.querySelectorAll('#deepWrap .ex').forEach(function(b){b.onclick=function(){ask(b.textContent);};});
+  }
+
+  /* ---------- handoff input ---------- */
+  $('handoffInput').placeholder = M.nl.handoffPlaceholder;
+  var hin=$('handoffInput');
+  hin.addEventListener('input',function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,140)+'px'; });
+  document.querySelector('.handoff .send').onclick=function(){
+    if(hin.value.trim()){ toast('Sent to agent — it will re-plan and update the proposal.'); hin.value=''; hin.style.height='auto'; }
+  };
+
+  /* ---------- tiny toast ---------- */
+  var toastEl;
+  function toast(msg){
+    if(!toastEl){
+      toastEl=document.createElement('div');
+      toastEl.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--nav);color:#fff;padding:10px 18px;border-radius:9px;font-size:13px;z-index:90;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:opacity .2s;opacity:0';
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent=msg; toastEl.style.opacity='1';
+    clearTimeout(toastEl._t);
+    toastEl._t=setTimeout(function(){toastEl.style.opacity='0';},2600);
+  }
+
+  /* ---------- esc key closes overlays ---------- */
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){
+      if(modalScrim.classList.contains('show')) closeModal();
+      else if(drawer.classList.contains('show')) closeDrawer();
+      else if($('deep').classList.contains('show')) $('deep').classList.remove('show');
+    }
+  });
+})();
+</script>
+</body>
+</html>

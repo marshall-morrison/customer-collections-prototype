@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Collections Agent — layout variations</title>
+<style>
+  :root { --ink:#1c1c1a; --helper:#75786f; --border:#dfdfdf; --blue:#2476d8; --bg:#f2f2f0; --nav:#2d2e2b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif; }
+  header { background:var(--nav); color:#fff; padding:28px 40px; }
+  header .wm { font-weight:800; font-size:22px; letter-spacing:-.5px; }
+  header h1 { font-size:20px; margin:10px 0 4px; font-weight:600; }
+  header p { margin:0; opacity:.8; font-size:14px; max-width:760px; line-height:1.5; }
+  .wrap { max-width:1080px; margin:32px auto; padding:0 24px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .card .top { padding:18px 20px 0; }
+  .card .tag { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--blue); background:#eaf1fc; padding:3px 8px; border-radius:5px; }
+  .card h2 { font-size:17px; margin:10px 0 6px; }
+  .card p { font-size:13.5px; color:var(--helper); line-height:1.5; margin:0 0 14px; }
+  .card .mock { margin:0 20px 16px; border:1px solid var(--border); border-radius:8px; height:120px; background:#fafafa; display:flex; overflow:hidden; }
+  .card .open { margin:auto 20px 18px; }
+  .btn { display:inline-flex; align-items:center; gap:6px; background:var(--nav); color:#fff; text-decoration:none; padding:9px 16px; border-radius:7px; font-size:14px; font-weight:600; }
+  .note { font-size:13px; color:var(--helper); margin-top:24px; line-height:1.6; }
+  /* tiny ASCII-ish wireframe inside each card */
+  .wf { display:flex; width:100%; font-size:0; }
+  .wf .col { border-right:1px dashed #d7d7d2; padding:6px; }
+  .wf .col:last-child { border-right:none; }
+  .wf .b { background:#e3e4e0; border-radius:3px; margin-bottom:5px; }
+  .wf .blue { background:#cfe0fa; }
+  .wf .dark { background:#cdd2c2; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wm">tabs</div>
+  <h1>Collections Agent — single customer page · layout variations</h1>
+  <p>Same seven shapes, same mock data (Meridian Group). Only the arrangement differs — each honors the priority stack: ① instant context · ② proposed plan · ③ work area · ④ activity log · ④·⁵ learn-more · ⑤ future · control panel last · NL wraps.</p>
+</header>
+<div class="wrap">
+  <div class="grid">
+
+    <div class="card">
+      <div class="top"><span class="tag">A</span><h2>Timeline left / Work area right</h2>
+        <p>Closest to today's Figma. Left ~40% column: brief → plan → future → Today → activity log. Right ~60%: a dominant, persistent work area.</p></div>
+      <div class="mock"><div class="wf" style="width:100%">
+        <div class="col" style="width:40%"><div class="b" style="height:14px"></div><div class="b blue" style="height:30px"></div><div class="b" style="height:10px"></div><div class="b" style="height:8px"></div><div class="b" style="height:8px"></div></div>
+        <div class="col" style="width:60%"><div class="b dark" style="height:14px"></div><div class="b" style="height:84px"></div></div>
+      </div></div>
+      <div class="open"><a class="btn" href="variation-a.html">Open A →</a></div>
+    </div>
+
+    <div class="card">
+      <div class="top"><span class="tag">B</span><h2>Context band on top</h2>
+        <p>Instant-context hero spans full width. Below: left merges plan + future into one "Now / Next"; right is the work area; activity log tucked in a drawer.</p></div>
+      <div class="mock"><div class="wf" style="width:100%;flex-direction:column">
+        <div style="padding:6px"><div class="b blue" style="height:26px"></div></div>
+        <div style="display:flex;flex:1;padding:0 6px 6px">
+          <div class="col" style="width:50%;border-right:1px dashed #d7d7d2"><div class="b" style="height:12px"></div><div class="b" style="height:12px"></div></div>
+          <div class="col" style="width:50%"><div class="b dark" style="height:58px"></div></div>
+        </div>
+      </div></div>
+      <div class="open"><a class="btn" href="variation-b.html">Open B →</a></div>
+    </div>
+
+    <div class="card">
+      <div class="top"><span class="tag">C</span><h2>Plan center stage</h2>
+        <p>Three panes. Left rail = activity log as "the why" (filters when you select an action). Center = plan, the star. Right = work area + invoice data + learn-more.</p></div>
+      <div class="mock"><div class="wf" style="width:100%">
+        <div class="col" style="width:26%"><div class="b" style="height:9px"></div><div class="b" style="height:9px"></div><div class="b" style="height:9px"></div><div class="b" style="height:9px"></div></div>
+        <div class="col" style="width:44%"><div class="b" style="height:12px"></div><div class="b blue" style="height:60px"></div></div>
+        <div class="col" style="width:30%"><div class="b dark" style="height:40px"></div><div class="b" style="height:16px"></div></div>
+      </div></div>
+      <div class="open"><a class="btn" href="variation-c.html">Open C →</a></div>
+    </div>
+
+    <div class="card">
+      <div class="top"><span class="tag">D</span><h2>Single reading column</h2>
+        <p>One centered column where scroll order IS the priority: context → plan (artifacts inline) → next → history. Work area slides in as an overlay on click.</p></div>
+      <div class="mock"><div class="wf" style="width:100%;justify-content:center">
+        <div class="col" style="width:60%;border:none"><div class="b blue" style="height:20px"></div><div class="b" style="height:34px"></div><div class="b" style="height:12px"></div><div class="b" style="height:20px"></div></div>
+      </div></div>
+      <div class="open"><a class="btn" href="variation-d.html">Open D →</a></div>
+    </div>
+
+  </div>
+  <p class="note">Each is a clickable mock: emails in the activity log open read-only in the work area; proposed actions show their kind-specific artifact (send email editor, schedule task, mark-pending yes/no, escalate flag) with approve/reject; an "Action artifacts" tab shows every action flavor; "Learn more about this customer" opens the deep view (drilled invoices · insights · agent chat · customer info); pause-agent vs pause-dunning are distinct levers; escalation is a star/tag.</p>
+</div>
+</body>
+</html>

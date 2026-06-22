@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Collections Agent — Mock</title>
+<style>
+  :root {
+    --cloud900: #2d2e2b;
+    --cloud950: #1c1c1a;
+    --cloud500: #75786f;
+    --cloud400: #93968c;
+    --cloud300: #b8bab4;
+    --cloud200: #d3d4d0;
+    --cloud100: #e7e8e6;
+    --tertiary: #d3d6c2;
+    --tertiary-bg: #d3d6c3;
+    --blue: #2476d8;
+    --timeline: #4074d7;
+    --border: #dfdfdf;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f2f2f0; font-family: var(--font); color: var(--cloud950); }
+
+  /* ---- App shell : fixed 1280 x 832 like the figma frame ---- */
+  .app {
+    width: 1280px;
+    height: 832px;
+    background: #fff;
+    display: flex;
+    position: relative;
+    margin: 24px auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,.12);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  /* ---- Left nav ---- */
+  .nav { width: 200px; background: var(--cloud900); color: #fff; display: flex; flex-direction: column; justify-content: space-between; padding: 8px 0 16px; flex: none; }
+  .nav .wordmark { font-weight: 800; font-size: 22px; letter-spacing: -.5px; padding: 10px 16px; }
+  .nav .merchant { font-size: 12px; font-weight: 500; padding: 4px 16px; color: #fff; }
+  .nav-group { margin-top: 16px; display: flex; flex-direction: column; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 14px; font-weight: 500; color: #fff; cursor: default; }
+  .nav-item .chev { margin-left: auto; opacity: .7; font-size: 10px; }
+  .nav-item.dim { color: var(--cloud100); }
+  .nav-bottom { font-size: 12px; }
+  .nav-bottom .nav-item { font-size: 12px; padding: 6px 16px; }
+  .nav-bottom .demo { color: var(--cloud400); font-size: 12px; font-weight: 500; padding: 4px 16px; }
+  .nav-ico { width: 16px; height: 16px; flex: none; opacity: .9; }
+
+  /* ---- Content ---- */
+  .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .chrome { height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 16px; }
+  .breadcrumb { flex: 1; font-size: 14px; }
+  .breadcrumb b { font-weight: 600; }
+  .chrome-ico { width: 14px; height: 14px; opacity: .7; }
+
+  .page-header { height: 38px; display: flex; align-items: center; gap: 16px; padding: 0 16px; }
+  .page-title { font-size: 20px; font-weight: 600; }
+  .rel-switch { display: flex; align-items: center; gap: 6px; }
+  .rel-switch .lbl-b { font-size: 12px; font-weight: 600; }
+  .rel-switch .lbl { font-size: 12px; }
+  .switch { width: 32px; height: 16px; border-radius: 50px; background: var(--cloud200); position: relative; flex: none; }
+  .switch.on { background: var(--blue); }
+  .switch .knob { width: 14px; height: 14px; border-radius: 50%; background: #fff; position: absolute; top: 1px; left: 1px; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+  .switch.on .knob { left: 17px; }
+  .spacer { flex: 1; }
+
+  .btn { display: inline-flex; align-items: center; gap: 4px; padding: 10px 16px; border: 1px solid var(--tertiary); border-radius: 6px; background: #fff; font-size: 14px; cursor: pointer; line-height: 18px; white-space: nowrap; }
+  .btn:hover { background: #fafaf8; }
+  .btn.solid { background: var(--tertiary-bg); }
+  .btn.sm { padding: 5px 16px; }
+  .btn .ico { width: 14px; height: 14px; }
+  .linklike { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer; }
+
+  /* ---- two columns ---- */
+  .columns { flex: 1; display: flex; gap: 8px; padding: 0 16px 0; min-height: 0; position: relative; }
+  .timeline-col { width: 425px; flex: none; height: 100%; overflow-y: auto; padding-bottom: 16px; }
+  .work-area { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 8px 0 16px; overflow-y: auto; }
+
+  /* Agent header block */
+  .agent-block { padding: 8px 0; display: flex; flex-direction: column; gap: 8px; }
+  .agent-tabs { display: flex; align-items: center; gap: 8px; }
+  .agent-tabs .spacer { flex: 1; }
+  .agent-summary { font-size: 12px; line-height: 14px; }
+
+  /* section labels */
+  .section { border: 1px solid var(--border); border-bottom: none; }
+  .section.future { padding: 8px 12px 0; }
+  .section-head { display: flex; align-items: center; gap: 8px; }
+  .section-head .title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .section-head .right { margin-left: auto; }
+
+  /* present / proposed plan */
+  .present {
+    border: 1px solid var(--border);
+    border-top: none;
+    padding: 8px 12px;
+    background: linear-gradient(181deg, #fff 76%, #eee 104%);
+    box-shadow: 0 1px 2.5px rgba(0,0,0,.2);
+  }
+  .proposed { padding-left: 8px; padding-bottom: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .proposed .title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .plan-item { display: flex; align-items: center; gap: 10px; }
+  .plan-item .desc { flex: 1; font-size: 12px; line-height: 14px; }
+  .plan-item .desc b { font-weight: 600; }
+
+  /* timeline entries */
+  .entry { display: flex; gap: 4px; align-items: flex-start; width: 100%; padding: 8px 0; }
+  .entry .dot-col { width: 19px; flex: none; display: flex; justify-content: center; padding-top: 5px; }
+  .entry .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cloud950); }
+  .entry.future-entry .dot, .entry.future-entry .ico-col svg { color: var(--cloud500); }
+  .entry .ico-col { width: 19px; flex: none; display: flex; justify-content: center; padding-top: 2px; }
+  .entry .body { flex: 1; min-width: 0; padding-left: 8px; display: flex; flex-direction: column; justify-content: center; }
+  .entry .etitle { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 600; }
+  .entry .edetails { font-size: 12px; line-height: normal; word-break: break-word; }
+  .entry.muted .etitle, .entry.muted .edetails { color: var(--cloud500); }
+  .entry .edate { width: 80px; flex: none; padding-left: 16px; text-align: right; font-size: 12px; display: flex; flex-direction: column; align-items: flex-end; }
+  .entry .ico { width: 14px; height: 14px; flex: none; }
+
+  .past-wrap { border: 1px solid var(--border); border-top: none; padding: 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+  .today-marker { display: flex; gap: 4px; align-items: flex-start; padding-top: 8px; }
+  .today-marker .bar { width: 19px; flex: none; height: 8px; }
+  .today-marker .body { flex: 1; padding: 0 8px; }
+  .today-marker .t { font-size: 14px; font-weight: 600; }
+  .today-marker .d { font-size: 12px; }
+  .today-marker .edate { width: 80px; text-align: right; font-size: 12px; }
+
+  /* vertical timeline line */
+  .tl-line { position: absolute; left: 38px; width: 1px; background: var(--timeline); }
+
+  /* ---- Email work area (static mock) ---- */
+  .wa-chrome { display: flex; justify-content: flex-end; }
+  .email-card { border-radius: 7px; padding: 0 8px 16px; position: relative; }
+  .email-topper { padding: 8px 8px 4px; }
+  .email-line { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .email-line .grow { flex: 1; }
+  .email-line .muted { color: var(--cloud300); }
+  .email-line .ul { text-decoration: underline; }
+  .received { background: var(--cloud100); border: 2px solid #d5d5d5; border-radius: 7px; padding: 12px 20px 20px; margin: 0 8px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 5px rgba(0,0,0,.05); }
+  .received .subj { font-weight: 700; font-size: 14px; }
+  .received p { margin: 0; font-size: 14px; line-height: 20px; }
+  .draft-head { padding: 16px 0 4px; }
+  .draft-head .who { font-weight: 700; color: #7c7c7c; font-size: 14px; }
+  .draft { background: #fff; border: 1px dashed #b2b2b2; border-radius: 7px; padding: 12px 20px 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 5px rgba(0,0,0,.05); margin: 0 10px; }
+  .draft b { font-weight: 700; }
+  .draft p { margin: 0; font-size: 14px; line-height: 20px; }
+  .pdfs { padding: 8px 10px 0; }
+  .pdfs .h { display: flex; gap: 10px; font-size: 14px; color: #7c7c7c; }
+  .pdfs .h b { font-weight: 700; flex: 1; }
+  .pdf-line { display: flex; gap: 10px; align-items: center; font-size: 14px; padding-top: 4px; }
+  .checkbox { width: 14px; height: 14px; border: 1.5px solid var(--blue); border-radius: 3px; background: var(--blue); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; flex: none; }
+
+  /* ---- Editor drawer ---- */
+  .edit-fab {
+    position: fixed; top: 24px; right: 24px; z-index: 50;
+    background: var(--cloud900); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,.2); display: flex; align-items: center; gap: 8px;
+  }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100vh; width: 420px; z-index: 60;
+    background: #fff; box-shadow: -4px 0 30px rgba(0,0,0,.18);
+    transform: translateX(100%); transition: transform .22s ease; display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .drawer-head h2 { font-size: 16px; margin: 0; flex: 1; }
+  .drawer-head .x { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--cloud500); }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 16px 20px 60px; }
+  .scenario-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .scenario-row select { flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: var(--font); }
+  .grp { margin-bottom: 20px; }
+  .grp > h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--cloud500); margin: 0 0 8px; display: flex; align-items: center; }
+  .grp > h3 .add { margin-left: auto; background: var(--cloud100); border: none; border-radius: 5px; padding: 3px 10px; font-size: 12px; cursor: pointer; color: var(--cloud950); font-weight: 600; }
+  .ecard { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fafafa; }
+  .ecard .row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .ecard label { font-size: 11px; color: var(--cloud500); display: block; margin-bottom: 2px; }
+  .ecard .fld { flex: 1; min-width: 0; }
+  .ecard input, .ecard textarea, .ecard select {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px;
+    font-size: 12px; font-family: var(--font); resize: vertical;
+  }
+  .ecard textarea { min-height: 44px; }
+  .ecard .card-top { display: flex; align-items: center; margin-bottom: 6px; }
+  .ecard .card-top .ix { font-size: 11px; font-weight: 700; color: var(--cloud400); }
+  .ecard .card-top .del { margin-left: auto; background: none; border: none; color: #c0392b; cursor: pointer; font-size: 12px; }
+  .hint { font-size: 12px; color: var(--cloud500); margin: -4px 0 16px; line-height: 1.4; }
+
+  /* ---- Prototype scenario toolbar ---- */
+  .proto-toolbar {
+    position: sticky; top: 0; z-index: 40;
+    width: 1280px; margin: 24px auto 0;
+    background: var(--cloud900); color: #fff;
+    border-radius: 8px 8px 0 0; padding: 10px 16px;
+  }
+  .pt-row { display: flex; align-items: center; gap: 10px; }
+  .pt-tag { font-size: 10px; font-weight: 700; letter-spacing: 1px; background: var(--blue); color: #fff; padding: 2px 6px; border-radius: 4px; }
+  .pt-label { font-size: 13px; font-weight: 600; opacity: .85; }
+  .pt-arrow { background: rgba(255,255,255,.12); color: #fff; border: none; width: 26px; height: 26px; border-radius: 6px; font-size: 16px; cursor: pointer; line-height: 1; }
+  .pt-arrow:hover { background: rgba(255,255,255,.25); }
+  .proto-toolbar select { flex: 1; max-width: 420px; padding: 6px 10px; border-radius: 6px; border: none; font-size: 13px; font-family: var(--font); background: #fff; color: var(--cloud950); }
+  .pt-count { font-size: 12px; opacity: .8; min-width: 44px; }
+  .pt-hint { font-size: 11px; opacity: .5; margin-left: auto; }
+  .pt-note { font-size: 12.5px; line-height: 1.5; margin-top: 8px; color: #e7e8e6; opacity: .92; }
+  .app { margin-top: 0; border-radius: 0 0 8px 8px; }
+
+  /* ---- canonical-type rendering ---- */
+  svg.ico { width: 14px; height: 14px; flex: none; }
+  .plan-item .desc { display: flex; gap: 6px; align-items: flex-start; }
+  .plan-item .desc .ico { flex: none; margin-top: 1px; color: var(--cloud500); }
+  .plan-item.unavailable { opacity: .6; }
+  .plan-item.unavailable .desc .ico { color: #c0392b; }
+  .na-tag { font-size: 11px; color: #c0392b; border: 1px solid #e6c3bd; border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+  .inv-chip { display: inline-block; font-size: 10px; font-weight: 600; background: var(--cloud100); color: var(--cloud500); border-radius: 4px; padding: 1px 5px; vertical-align: middle; }
+  .entry .etitle .ico { color: var(--cloud500); }
+  .entry.future-entry .etitle .ico { color: var(--cloud500); }
+
+  /* email entry (clickable) */
+  .entry.email { cursor: pointer; border-radius: 6px; }
+  .entry.email:hover { background: #f5f7fb; }
+  .entry.email.selected { background: #eaf1fc; box-shadow: inset 2px 0 0 var(--blue); }
+  .dir-tag { font-size: 10px; font-weight: 600; color: var(--cloud500); text-transform: uppercase; letter-spacing: .3px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 600; border-radius: 4px; padding: 1px 5px; margin-left: 4px; }
+  .badge.info { background: #eef0ea; color: #5d6155; }
+  .badge.bad { background: #fbe9e7; color: #c0392b; }
+
+  /* email viewer (work area) */
+  #emailViewer { min-height: 200px; }
+  .ev-empty { color: var(--cloud400); font-size: 14px; text-align: center; padding: 60px 20px; line-height: 1.6; }
+  .ev-empty span { font-size: 12px; }
+  .ev-head { padding: 8px 8px 10px; }
+  .ev-row { display: flex; align-items: baseline; gap: 8px; }
+  .ev-from { font-weight: 700; font-size: 14px; flex: 1; }
+  .ev-when { color: var(--cloud400); font-size: 12px; }
+  .ev-row2 { font-size: 12px; color: var(--cloud500); margin-top: 2px; }
+  .ev-dir { font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+  .ev-card { background: var(--cloud100); border: 2px solid #d5d5d5; border-radius: 7px; padding: 14px 18px; box-shadow: 0 4px 5px rgba(0,0,0,.05); }
+  .ev-subj { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+  .ev-body { font-size: 14px; line-height: 20px; color: var(--cloud950); }
+
+  /* editor: generic grid + flags */
+  .ecard-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ecard-grid .fld { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  .flag-row { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 2px; }
+  .flag { font-size: 11px; color: var(--cloud950); display: inline-flex; align-items: center; gap: 4px; }
+  .flag input { width: auto; }
+</style>
+</head>
+<body>
+
+<button class="edit-fab" id="editFab">✎ Edit mock data</button>
+
+<!-- Prototype scenario toolbar (not part of the product UI) -->
+<div class="proto-toolbar">
+  <div class="pt-row">
+    <span class="pt-tag">PROTOTYPE</span>
+    <span class="pt-label">Scenario</span>
+    <button class="pt-arrow" id="prevScn" title="Previous (←)">‹</button>
+    <select id="scenarioTop"></select>
+    <button class="pt-arrow" id="nextScn" title="Next (→)">›</button>
+    <span class="pt-count" id="scnCount"></span>
+    <span class="pt-hint">← / → to cycle</span>
+  </div>
+  <div class="pt-note" id="scnNote"></div>
+</div>
+
+<div class="app">
+  <!-- ============ NAV ============ -->
+  <aside class="nav">
+    <div>
+      <div class="wordmark">tabs</div>
+      <div class="merchant">Merchant company name</div>
+      <div class="nav-group">
+        <div class="nav-item">◎ Overview</div>
+        <div class="nav-item">▦ Customers</div>
+        <div class="nav-item">▤ Contracts <span class="chev">›</span></div>
+        <div class="nav-item">▥ Invoicing <span class="chev">›</span></div>
+        <div class="nav-item dim">▧ Usage <span class="chev">›</span></div>
+        <div class="nav-item">⊞ Revenue <span class="chev">›</span></div>
+        <div class="nav-item">▦ Reporting <span class="chev">›</span></div>
+        <div class="nav-item dim">▤ Data <span class="chev">›</span></div>
+      </div>
+    </div>
+    <div class="nav-bottom">
+      <div class="nav-item">⊕ Integrations</div>
+      <div class="nav-item">⚙ Settings</div>
+      <div class="nav-item">◓ Firstname Lastname</div>
+      <div class="demo">Demo</div>
+    </div>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <div class="content">
+    <div class="chrome">
+      <div class="breadcrumb">Revenue &gt; Customer Name &gt; <b>Collections</b></div>
+      <span class="chrome-ico">🔍</span>
+      <span class="chrome-ico">?</span>
+    </div>
+
+    <div class="page-header">
+      <div class="page-title">Collections</div>
+      <div class="rel-switch">
+        <span class="lbl-b">Relationship</span>
+        <div class="switch"><div class="knob"></div></div>
+        <span class="lbl">Normal</span>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn solid">⏸ Pause</button>
+    </div>
+
+    <div class="columns">
+      <div class="tl-line" id="tlLine"></div>
+
+      <!-- ===== TIMELINE COLUMN (editable regions live here) ===== -->
+      <div class="timeline-col">
+
+        <!-- Agent header -->
+        <div class="agent-block">
+          <div class="agent-tabs">
+            <button class="btn">⚡ Agent</button>
+            <div class="spacer"></div>
+            <button class="btn">▤ Policy</button>
+            <button class="btn">📊 Insights</button>
+          </div>
+          <div class="agent-summary" id="agentSummary"></div>
+        </div>
+
+        <!-- FUTURE: scheduled actions -->
+        <div class="section future">
+          <div class="section-head">
+            <div class="title">Scheduled Actions ⏱</div>
+            <div class="right linklike">⏸ Pause dunning</div>
+          </div>
+          <div id="scheduledList"></div>
+        </div>
+
+        <!-- PRESENT: proposed plan (active plan) -->
+        <div class="present">
+          <div class="proposed">
+            <div class="title" id="proposedCount">2 Proposed Actions</div>
+            <div id="proposedList"></div>
+          </div>
+          <div class="today-marker">
+            <div class="bar"></div>
+            <div class="body">
+              <div class="t">Today</div>
+              <div class="d" id="todayCount">34 events to date</div>
+            </div>
+            <div class="edate"><div>Jun 4, 2026</div><div>12:31 AM</div></div>
+          </div>
+        </div>
+
+        <!-- PAST: timeline events -->
+        <div class="past-wrap" id="pastList"></div>
+      </div>
+
+      <!-- ===== WORK AREA (email viewer — populated when an email is clicked) ===== -->
+      <div class="work-area">
+        <div class="wa-chrome"><button class="btn">✉ New email</button></div>
+        <div class="email-card" id="emailViewer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ EDITOR DRAWER ============ -->
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2>Edit mock data</h2>
+    <button class="x" id="drawerClose">×</button>
+  </div>
+  <div class="drawer-body">
+    <div class="scenario-row">
+      <select id="scenarioSelect"></select>
+      <button class="btn sm" id="resetBtn">Reset</button>
+    </div>
+    <p class="hint">Edit any field and the timeline updates live. Add or remove entries to feel out different states (empty, overloaded, single proposed action, etc.).</p>
+
+    <div class="grp">
+      <h3>Agent summary <button class="add" data-add="summary" style="visibility:hidden">+</button></h3>
+      <div class="ecard"><textarea id="summaryInput"></textarea></div>
+    </div>
+
+    <div class="grp">
+      <h3>Future <button class="add" data-add="future">+ Add</button></h3>
+      <div id="futureEditor"></div>
+    </div>
+
+    <div class="grp">
+      <h3>Proposed (active plan) <button class="add" data-add="proposed">+ Add</button></h3>
+      <div id="proposedEditor"></div>
+    </div>
+
+    <div class="grp">
+      <h3>Happened <button class="add" data-add="happened">+ Add</button></h3>
+      <div id="happenedEditor"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

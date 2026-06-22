@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Collections Agent — Meridian Group</title>
+<style>
+  :root{
+    --nav:#2d2e2b; --text:#1c1c1a; --helper:#75786f; --border:#dfdfdf;
+    --accent:#2476d8; --tint:#d3d6c2; --surface:#fff; --bg:#f2f2f0;
+    --radius:10px; --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text);background:var(--bg);font-size:14px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer}
+  /* ---- shell ---- */
+  .shell{display:flex;min-height:100vh}
+  .rail{
+    width:56px;background:var(--nav);color:#cfd0c9;flex:0 0 56px;
+    display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;position:sticky;top:0;height:100vh;
+  }
+  .rail .logo{width:30px;height:30px;border-radius:8px;background:var(--tint);color:var(--nav);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;margin-bottom:12px}
+  .rail .ico{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:17px;color:#a9aaa2;opacity:.8}
+  .rail .ico.active{background:rgba(255,255,255,.10);color:#fff;opacity:1}
+  .rail .spacer{flex:1}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+
+  /* ---- top utility / control bar ---- */
+  .util{
+    background:var(--nav);color:#e7e8e2;padding:9px 22px;display:flex;align-items:center;gap:16px;
+    flex-wrap:wrap;position:sticky;top:0;z-index:40;
+  }
+  .util .cust{display:flex;flex-direction:column;line-height:1.2}
+  .util .cust b{font-size:14px;color:#fff}
+  .util .cust span{font-size:11px;color:#a9aaa2}
+  .util .levers{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center}
+  .lever{
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#e7e8e2;
+    border-radius:7px;padding:6px 11px;font-size:12px;display:inline-flex;align-items:center;gap:7px;
+  }
+  .lever:hover{background:rgba(255,255,255,.13)}
+  .lever .dot{width:8px;height:8px;border-radius:50%;background:#5fbf6a}
+  .lever.on .dot{background:#e0a93b}
+  .lever.kill{border-color:rgba(224,90,80,.5)}
+  .lever.kill.on{background:rgba(224,90,80,.22)}
+  .lever.kill.on .dot{background:#e05a50}
+  .lever.star.on{background:rgba(224,169,59,.2);border-color:rgba(224,169,59,.5)}
+  .lever.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .lever.primary:hover{background:#1f68bf}
+
+  /* ---- content scroller ---- */
+  .content{padding:22px;display:flex;flex-direction:column;gap:18px;max-width:1500px;width:100%}
+
+  /* ---- corner badge ---- */
+  .corner-badge{
+    position:fixed;right:14px;bottom:14px;z-index:60;background:var(--nav);color:#fff;
+    font-size:11px;font-weight:600;padding:7px 12px;border-radius:20px;box-shadow:var(--shadow);
+    border:1px solid rgba(255,255,255,.15);
+  }
+
+  /* ====== HERO context band (P1) ====== */
+  .hero{
+    background:linear-gradient(180deg,#fbfbf9,#fff);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:22px 24px;position:relative;overflow:hidden;
+  }
+  .hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent)}
+  .hero .htop{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .hero .badge-trig{
+    font-size:11px;font-weight:600;color:var(--accent);background:#eaf2fd;border:1px solid #cfe1fa;
+    padding:4px 10px;border-radius:20px;
+  }
+  .hero h1{font-size:13px;margin:0;color:var(--helper);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .hero .what{font-size:19px;line-height:1.45;font-weight:500;margin:0 0 12px;max-width:1050px}
+  .hero .what q{color:var(--text)}
+  .hero .why{
+    display:flex;gap:9px;align-items:flex-start;font-size:14px;color:#3a3c36;
+    background:#f6f7f1;border:1px solid #e6e8dc;border-radius:9px;padding:11px 14px;max-width:1050px;margin-bottom:14px;
+  }
+  .hero .why .tag{font-size:11px;font-weight:700;color:var(--helper);text-transform:uppercase;white-space:nowrap;padding-top:1px}
+  .needsyou{
+    display:flex;gap:11px;align-items:flex-start;background:#fdf4e7;border:1px solid #f0d9b0;
+    border-radius:9px;padding:12px 15px;max-width:1050px;margin-bottom:16px;
+  }
+  .needsyou .ny-ico{font-size:16px;line-height:1.3}
+  .needsyou .ny-body b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#9a6a14;margin-bottom:2px}
+  .needsyou .ny-body span{font-size:13.5px;color:#5a4413}
+  /* fact chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .chip{
+    display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);
+    border-radius:8px;padding:6px 11px;font-size:12.5px;
+  }
+  .chip .k{color:var(--helper)}
+  .chip .v{font-weight:600}
+  .chip.totals{background:#f4f6ee;border-color:#e2e5d6}
+  .chip.invoice{cursor:default}
+  .st{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;padding:2px 7px;border-radius:20px}
+  .st.overdue{background:#fdecea;color:#c0392b}
+  .st.disputed{background:#fdf4e7;color:#9a6a14}
+  .st.current{background:#eef6ee;color:#2e7d32}
+  .st.paid{background:#eef2f7;color:#5a6675}
+
+  /* ====== two columns ====== */
+  .cols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
+  @media(max-width:1080px){.cols{grid-template-columns:1fr}}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+  .card-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  .card-h h2{margin:0;font-size:15px;font-weight:600}
+  .card-h .sub{font-size:12px;color:var(--helper)}
+  .card-h .count{background:var(--tint);color:#4b4d40;font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px}
+  .card-h .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+  /* Now / Next zone */
+  .zone-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--helper);
+    padding:14px 18px 4px}
+  .zone-label.next{border-top:1px dashed var(--border);margin-top:4px}
+
+  .action{border:1px solid var(--border);border-radius:11px;margin:8px 14px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+  .action.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(36,118,216,.12)}
+  .action.rejected{opacity:.55}
+  .action-h{display:flex;align-items:flex-start;gap:11px;padding:12px 13px;cursor:pointer;background:#fcfcfb}
+  .action-h:hover{background:#f7f7f4}
+  .kind-ic{width:30px;height:30px;border-radius:8px;flex:0 0 30px;display:flex;align-items:center;justify-content:center;
+    font-size:15px;background:#eef2f7;color:#3a4858}
+  .kind-ic.send_email{background:#eaf2fd;color:#2476d8}
+  .kind-ic.mark_pending{background:#fdf4e7;color:#9a6a14}
+  .kind-ic.schedule_task{background:#f0eefb;color:#6a4fbf}
+  .kind-ic.escalate{background:#fdecea;color:#c0392b}
+  .action-meta{flex:1;min-width:0}
+  .action-meta .ttl{font-weight:600;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .action-meta .ttl .inv{font-size:10.5px;font-weight:700;color:var(--helper);background:#f2f2f0;border:1px solid var(--border);padding:1px 6px;border-radius:5px}
+  .action-meta .dsc{font-size:12.5px;color:var(--helper);margin-top:2px}
+  .toggles{display:flex;gap:6px;flex:0 0 auto}
+  .tg{font-size:11.5px;font-weight:600;border:1px solid var(--border);background:#fff;border-radius:7px;padding:5px 10px;color:var(--helper)}
+  .tg.app.active{background:#eef6ee;border-color:#bcdcbe;color:#2e7d32}
+  .tg.rej.active{background:#fdecea;border-color:#f0c4bf;color:#c0392b}
+  .chev{margin-left:2px;color:var(--helper);font-size:12px;transition:transform .15s;flex:0 0 auto;align-self:center}
+  .action.open .chev{transform:rotate(90deg)}
+  .artifact{display:none;border-top:1px solid var(--border);padding:13px;background:#fff}
+  .action.open .artifact{display:block}
+
+  /* future tiles */
+  .seqbar{display:flex;align-items:center;gap:9px;padding:6px 18px 0;font-size:12px;color:var(--helper)}
+  .seqbar .sname{font-weight:600;color:var(--text)}
+  .broken{font-size:10.5px;font-weight:700;text-transform:uppercase;background:#fdecea;color:#c0392b;border:1px solid #f0c4bf;border-radius:20px;padding:2px 8px}
+  .future-tile{display:flex;gap:11px;align-items:flex-start;border:1px solid var(--border);border-left:3px solid #cfd2c2;
+    border-radius:9px;margin:8px 14px;padding:11px 13px;background:#fcfcfb}
+  .future-tile .ft-when{flex:0 0 78px;font-size:12px;font-weight:600;color:#4b4d40}
+  .future-tile .ft-when span{display:block;font-weight:400;color:var(--helper);font-size:11px}
+  .future-tile .ft-body{flex:1;min-width:0}
+  .future-tile .ft-body .h{font-size:13.5px;font-weight:500}
+  .future-tile .ft-body .m{font-size:11.5px;color:var(--helper);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
+  .future-tile .ft-body .m .pill{background:#f2f2f0;border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+  .seeall{margin:2px 14px 12px;font-size:12px}
+  .seeall a{color:var(--accent);text-decoration:none;font-weight:600}
+  .future-hidden{display:none}
+
+  /* handoff input */
+  .handoff{margin:10px 14px 16px;border:1px dashed #c7cabb;border-radius:10px;background:#fafbf6;padding:11px 12px}
+  .handoff label{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--helper);display:block;margin-bottom:6px}
+  .handoff .row{display:flex;gap:8px}
+  .handoff input{flex:1;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit}
+  .handoff input:focus{outline:none;border-color:var(--accent)}
+  .handoff .send{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:0 16px;font-weight:600;font-size:13px}
+
+  /* ====== work area (right) ====== */
+  .work{position:sticky;top:74px}
+  .work-empty{padding:46px 22px;text-align:center;color:var(--helper)}
+  .work-empty .big{font-size:34px;margin-bottom:8px;opacity:.5}
+  .work-body{padding:0}
+  .email-view{padding:16px 18px}
+  .email-view .ev-h{border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px}
+  .email-view .ev-subj{font-size:16px;font-weight:600;margin-bottom:8px}
+  .ev-row{display:flex;gap:8px;font-size:12.5px;margin-bottom:3px}
+  .ev-row .lab{color:var(--helper);flex:0 0 54px}
+  .ev-body{font-size:13.5px;white-space:pre-wrap;line-height:1.6}
+  .ev-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;border-radius:20px;padding:2px 9px}
+  .ev-chip.in{background:#eef2f7;color:#5a6675}
+  .ev-chip.out{background:#eaf2fd;color:#2476d8}
+  .thread{margin-top:16px;border-top:1px dashed var(--border);padding-top:12px}
+  .thread h4{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--helper);margin:0 0 8px}
+  .thread .titem{font-size:12px;color:var(--helper);padding:6px 0;border-bottom:1px solid #f0f0ee}
+  .thread .titem b{color:var(--text)}
+  .readonly-tag{font-size:11px;color:var(--helper);background:#f2f2f0;border:1px solid var(--border);padding:2px 8px;border-radius:6px;float:right}
+
+  /* shared artifact form bits */
+  .fld{margin-bottom:11px}
+  .fld label{display:block;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--helper);margin-bottom:4px}
+  .fld input,.fld textarea,.fld select{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff}
+  .fld textarea{resize:vertical;min-height:120px;line-height:1.55}
+  .fld input:focus,.fld textarea:focus{outline:none;border-color:var(--accent)}
+  .att-chips{display:flex;gap:7px;flex-wrap:wrap}
+  .att{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#f6f7f1;border:1px solid #e2e5d6;border-radius:7px;padding:5px 9px}
+  .att .ext{font-size:9px;font-weight:700;background:#c0392b;color:#fff;border-radius:4px;padding:1px 4px}
+  .yesno{display:flex;gap:8px}
+  .yesno .yn{flex:1;border:1px solid var(--border);border-radius:8px;padding:9px;text-align:center;font-weight:600;font-size:13px;background:#fff;color:var(--helper)}
+  .yesno .yn.on{background:#eef6ee;border-color:#bcdcbe;color:#2e7d32}
+  .yesno .yn.no.on{background:#fdecea;border-color:#f0c4bf;color:#c0392b}
+  .li-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .li-table th{text-align:left;font-size:10px;text-transform:uppercase;color:var(--helper);padding:5px 6px;border-bottom:1px solid var(--border)}
+  .li-table td{padding:6px;border-bottom:1px solid #f0f0ee}
+  .li-table input{border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12.5px;width:100%}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  /* ====== activity log drawer (P4) ====== */
+  .log-tab{
+    position:fixed;left:56px;right:0;bottom:0;z-index:50;background:var(--surface);border-top:1px solid var(--border);
+    box-shadow:0 -4px 20px rgba(0,0,0,.07);transition:transform .25s ease;transform:translateY(calc(100% - 44px));
+  }
+  .log-tab.open{transform:translateY(0)}
+  .log-handle{display:flex;align-items:center;gap:10px;padding:10px 22px;cursor:pointer;user-select:none}
+  .log-handle h3{margin:0;font-size:14px;font-weight:600}
+  .log-handle .ct{font-size:11px;color:var(--helper)}
+  .log-handle .arrow{margin-left:auto;color:var(--helper);transition:transform .2s}
+  .log-tab.open .log-handle .arrow{transform:rotate(180deg)}
+  .log-body{max-height:50vh;overflow:auto;padding:4px 22px 22px}
+  .filterbar{font-size:12px;color:var(--helper);padding:6px 0;display:none;align-items:center;gap:8px}
+  .filterbar.show{display:flex}
+  .filterbar .clr{color:var(--accent);cursor:pointer;font-weight:600;border:none;background:none;font-size:12px}
+  .logrow{display:flex;gap:12px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid #f0f0ee}
+  .logrow.email{cursor:pointer;border-radius:8px}
+  .logrow.email:hover{background:#f7f9fc}
+  .logrow.dim{opacity:.3}
+  .lr-when{flex:0 0 96px;font-size:11.5px;color:var(--helper)}
+  .lr-when b{display:block;color:var(--text);font-weight:600}
+  .lr-ic{flex:0 0 26px;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;background:#f2f2f0}
+  .lr-ic.customer{background:#eef2f7;color:#5a6675}
+  .lr-ic.agent{background:#eaf2fd;color:#2476d8}
+  .lr-ic.system{background:#f0eefb;color:#6a4fbf}
+  .lr-ic.event{background:#fdf4e7;color:#9a6a14}
+  .lr-main{flex:1;min-width:0}
+  .lr-main .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .lr-main .sender{font-weight:600;font-size:13px}
+  .lr-tag{font-size:9.5px;font-weight:700;text-transform:uppercase;border-radius:5px;padding:1px 6px}
+  .lr-tag.received{background:#eef2f7;color:#5a6675}
+  .lr-tag.sent{background:#eaf2fd;color:#2476d8}
+  .lr-tag.inv{background:#f2f2f0;color:var(--helper);border:1px solid var(--border)}
+  .lr-tag.badge{background:#eef6ee;color:#2e7d32}
+  .lr-main .sub{font-size:13px;margin-top:1px}
+  .lr-main .prev{font-size:12px;color:var(--helper);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* ====== modal / drawer (Learn more, compose, artifacts) ====== */
+  .scrim{position:fixed;inset:0;background:rgba(28,28,26,.4);z-index:70;display:none}
+  .scrim.show{display:block}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,94vw);background:var(--bg);z-index:80;
+    transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column}
+  .drawer.show{transform:translateX(0)}
+  .drawer-h{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;gap:10px}
+  .drawer-h h2{margin:0;font-size:17px}
+  .drawer-h .x{margin-left:auto;border:none;background:#f2f2f0;border-radius:8px;width:32px;height:32px;font-size:16px;color:var(--helper)}
+  .drawer-b{flex:1;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+  .sect{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 16px}
+  .sect h3{margin:0 0 11px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--helper)}
+  .kv{display:flex;justify-content:space-between;gap:14px;padding:6px 0;border-bottom:1px solid #f0f0ee;font-size:13px}
+  .kv:last-child{border-bottom:none}
+  .kv .k{color:var(--helper)}
+  .kv .v{font-weight:600;text-align:right}
+  .insnap{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .insnap .ic{border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+  .insnap .ic .n{font-weight:700;font-size:14px}
+  .insnap .ic .l{font-size:11px;color:var(--helper);display:flex;gap:6px;align-items:center;margin-top:2px}
+  /* discovery chat */
+  .chatlog{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;min-height:30px}
+  .bubble{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13px}
+  .bubble.me{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:3px}
+  .bubble.ag{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:3px}
+  .ex-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+  .ex-chip{font-size:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:5px 11px;color:var(--accent)}
+  .ex-chip:hover{background:#eaf2fd}
+  .chat-row{display:flex;gap:8px}
+  .chat-row input{flex:1;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit}
+  .chat-row button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:0 15px;font-weight:600}
+
+  /* compose modal (centered) */
+  .modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-46%);z-index:80;width:min(620px,94vw);
+    background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:none;flex-direction:column;max-height:88vh}
+  .modal.show{display:flex}
+  .modal-h{padding:15px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center}
+  .modal-h h2{margin:0;font-size:16px}
+  .modal-h .x{margin-left:auto;border:none;background:#f2f2f0;border-radius:8px;width:30px;height:30px;color:var(--helper)}
+  .modal-b{padding:16px 18px;overflow:auto}
+  .modal-f{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:9px;justify-content:flex-end}
+  .btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:8px 15px;font-weight:600;font-size:13px;color:var(--text)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  /* artifact gallery accordion */
+  .gal-item{border:1px solid var(--border);border-radius:11px;margin:8px 14px;overflow:hidden}
+  .gal-h{display:flex;align-items:center;gap:11px;padding:12px 13px;cursor:pointer;background:#fcfcfb}
+  .gal-h:hover{background:#f7f7f4}
+  .gal-h .pat{margin-left:auto;font-size:11px;color:var(--helper);background:#f2f2f0;border:1px solid var(--border);border-radius:6px;padding:2px 8px}
+  .gal-h .chev{margin-left:8px}
+  .gal-b{display:none;border-top:1px solid var(--border);padding:13px;background:#fff}
+  .gal-item.open .gal-b{display:block}
+  .gal-item.open .chev{transform:rotate(90deg)}
+  .muted{color:var(--helper);font-size:12px}
+  .tabbar{display:flex;gap:4px;padding:4px 14px 0}
+  .tabbtn{border:1px solid transparent;background:none;border-radius:8px 8px 0 0;padding:8px 14px;font-size:13px;font-weight:600;color:var(--helper)}
+  .tabbtn.active{color:var(--text);border-color:var(--border);border-bottom-color:#fff;background:#fff;margin-bottom:-1px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- left product nav rail (static) -->
+  <nav class="rail">
+    <div class="logo">T</div>
+    <div class="ico" title="Home">⌂</div>
+    <div class="ico" title="Invoices">▤</div>
+    <div class="ico active" title="Collections">◎</div>
+    <div class="ico" title="Customers">☺</div>
+    <div class="ico" title="Reports">▦</div>
+    <div class="spacer"></div>
+    <div class="ico" title="Settings">⚙</div>
+  </nav>
+
+  <div class="main">
+    <!-- ===== top utility / control bar ===== -->
+    <div class="util">
+      <div class="cust">
+        <b id="custName"></b>
+        <span id="custDomain"></span>
+      </div>
+      <div class="levers">
+        <button class="lever" id="leverDunning" onclick="toggleDunning()" title="Holds reminders & moves invoice to pending">
+          <span class="dot"></span><span id="dunLabel">Dunning active</span>
+        </button>
+        <button class="lever kill" id="leverAgent" onclick="toggleAgent()" title="Kill switch — stops the agent entirely">
+          <span class="dot"></span><span id="agtLabel">Agent on</span>
+        </button>
+        <button class="lever star" id="leverEsc" onclick="toggleEsc()" title="Escalation flag (tag)">
+          <span>★</span><span>Escalated</span>
+        </button>
+        <button class="lever" onclick="openCompose()">✉ One-off email</button>
+        <button class="lever" onclick="openPolicy()">⚖ Permissions</button>
+        <button class="lever primary" onclick="openLearn()">Learn more about this customer →</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- ===================== HERO context band (P1) ===================== -->
+      <section class="hero">
+        <div class="htop">
+          <h1>Instant context</h1>
+          <span class="badge-trig" id="trigBadge"></span>
+        </div>
+        <p class="what" id="whatHappened"></p>
+        <div class="why"><span class="tag">Why this plan</span><span id="whyText"></span></div>
+        <div class="needsyou" id="needsYou">
+          <span class="ny-ico">✋</span>
+          <div class="ny-body"><b id="nyType"></b><span id="nyText"></span></div>
+        </div>
+        <div class="chips" id="factChips"></div>
+      </section>
+
+      <!-- ===================== two columns ===================== -->
+      <div class="cols">
+        <!-- LEFT: Now / Next (plan + future merged) -->
+        <section class="card" id="nowNext">
+          <div class="card-h">
+            <h2>Plan</h2>
+            <span class="count" id="planCount"></span>
+            <div class="right">
+              <button class="btn primary" style="padding:6px 13px" onclick="approveAll()">Approve all</button>
+            </div>
+          </div>
+          <div class="zone-label">Now · proposed (act on these)</div>
+          <div id="planActions"></div>
+
+          <!-- work-handoff input lives with the plan -->
+          <div class="handoff">
+            <label>Hand off to the agent</label>
+            <div class="row">
+              <input id="handoffInput" type="text" />
+              <button class="send" onclick="sendHandoff()">Send</button>
+            </div>
+          </div>
+
+          <div class="zone-label next">Next · scheduled (same continuum)</div>
+          <div class="seqbar">
+            <span>Sequence:</span><span class="sname" id="seqName"></span>
+            <span class="broken" id="seqBroken" style="display:none">⚠ Broken</span>
+          </div>
+          <div id="futureTiles"></div>
+          <div class="seeall" id="seeAllWrap" style="display:none">
+            <a href="#" onclick="showAllFuture();return false;" id="seeAllLink"></a>
+          </div>
+        </section>
+
+        <!-- RIGHT: Work area (P3) -->
+        <section class="card work">
+          <div class="card-h">
+            <h2 id="workTitle">Work area</h2>
+            <span class="sub" id="workSub">Pick an email from the activity log, or open an action to edit it</span>
+          </div>
+          <div id="workArea" class="work-body">
+            <div class="work-empty">
+              <div class="big">✉</div>
+              <div>Nothing open yet.</div>
+              <div style="font-size:12.5px;margin-top:4px">Click an email in the activity log below, or expand a proposed action.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===================== Action-artifact gallery (tab/accordion) ===================== -->
+      <section class="card">
+        <div class="tabbar">
+          <button class="tabbtn active" id="tabGalleryBtn" onclick="showGallery()">Action artifacts</button>
+          <button class="tabbtn" id="tabAboutBtn" onclick="hideGallery()">About these artifacts</button>
+        </div>
+        <div id="galleryPane" style="padding-bottom:12px"></div>
+        <div id="aboutPane" style="display:none;padding:16px 18px" class="muted">
+          Every proposed or queued action resolves to one of these editable artifacts. The agent fills them in; you edit, approve, or reject. Each pattern below is rendered live from <code>MOCK.actionCatalog</code>.
+        </div>
+      </section>
+      <div style="height:60px"></div><!-- breathing room above log drawer -->
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Activity-log drawer (P4) ===================== -->
+<div class="log-tab" id="logTab">
+  <div class="log-handle" onclick="toggleLog()">
+    <h3>Activity log</h3>
+    <span class="ct" id="logCount"></span>
+    <span class="arrow">▲</span>
+  </div>
+  <div class="log-body">
+    <div class="filterbar" id="filterBar">
+      Filtered to <b id="filterInv">&nbsp;</b><button class="clr" onclick="clearFilter()">clear filter</button>
+    </div>
+    <div id="logRows"></div>
+  </div>
+</div>
+
+<!-- ===================== overlays ===================== -->
+<div class="scrim" id="scrim" onclick="closeAll()"></div>
+
+<!-- Learn-more drawer -->
+<div class="drawer" id="learnDrawer">
+  <div class="drawer-h">
+    <h2>Learn more · <span id="learnCust"></span></h2>
+    <button class="x" onclick="closeAll()">✕</button>
+  </div>
+  <div class="drawer-b" id="learnBody"></div>
+</div>
+
+<!-- Policy drawer -->
+<div class="drawer" id="policyDrawer">
+  <div class="drawer-h"><h2>Permissions · policy</h2><button class="x" onclick="closeAll()">✕</button></div>
+  <div class="drawer-b">
+    <div class="sect">
+      <h3>What the agent may do without approval</h3>
+      <div class="kv"><span class="k">Send dunning emails</span><span class="v">Auto</span></div>
+      <div class="kv"><span class="k">Mark invoice pending</span><span class="v">Needs approval</span></div>
+      <div class="kv"><span class="k">Apply credit memo</span><span class="v">Needs approval</span></div>
+      <div class="kv"><span class="k">Escalate to owner</span><span class="v">Auto-allowed</span></div>
+      <div class="kv"><span class="k">Edit invoice / billing</span><span class="v">Needs approval</span></div>
+    </div>
+    <p class="muted">Tightening a permission here is what turns a "Now" action into a queued, approval-gated one.</p>
+  </div>
+</div>
+
+<!-- Compose one-off modal -->
+<div class="modal" id="composeModal">
+  <div class="modal-h"><h2>Send one-off email</h2><button class="x" onclick="closeAll()">✕</button></div>
+  <div class="modal-b">
+    <div class="fld"><label>To</label><input type="text" value="finance@meridiangroup.com"/></div>
+    <div class="fld"><label>Subject</label><input type="text" placeholder="Subject…"/></div>
+    <div class="fld"><label>Body</label><textarea placeholder="Write a message to Meridian Group…"></textarea></div>
+  </div>
+  <div class="modal-f"><button class="btn" onclick="closeAll()">Cancel</button><button class="btn primary" onclick="closeAll()">Send</button></div>
+</div>
+
+<div class="corner-badge">B — Context band on top</div>
+
+<script src="shared/mock.js"></script>
+<script>
+const M = window.MOCK;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* ---------- header / hero ---------- */
+$('custName').textContent = M.customer.name;
+$('custDomain').textContent = M.customer.domain + ' · ' + M.merchant.name;
+$('learnCust').textContent = M.customer.name;
+$('trigBadge').textContent = M.instantContext.trigger;
+$('whatHappened').textContent = M.instantContext.whatHappened;
+$('whyText').textContent = M.instantContext.why;
+
+(function(){
+  const ny = M.instantContext.needsYou;
+  if(!ny){ $('needsYou').style.display='none'; return; }
+  const labels = {cannot_execute:"Can't execute — needs you", policy_review:"Policy review needed", needs_judgment:"Needs your judgment"};
+  $('nyType').textContent = labels[ny.type] || 'Needs you';
+  $('nyText').textContent = ny.text;
+})();
+
+/* fact chips: totals + invoices */
+(function(){
+  const c = $('factChips');
+  c.innerHTML =
+    `<span class="chip totals"><span class="k">Outstanding</span><span class="v">${esc(M.totals.outstanding)}</span></span>`+
+    `<span class="chip totals"><span class="k">Overdue</span><span class="v">${esc(M.totals.overdue)}</span></span>`+
+    M.invoices.map(iv =>
+      `<span class="chip invoice"><span class="v">${esc(iv.number)}</span><span class="k">${esc(iv.amount)}</span>`+
+      `<span class="st ${iv.status}">${esc(iv.status)}</span>`+
+      (iv.daysOverdue>0?`<span class="k">${iv.daysOverdue}d</span>`:``)+`</span>`
+    ).join('');
+})();
+
+/* ---------- PLAN (Now) ---------- */
+const KIND_IC = {send_email:'✉', mark_pending:'⏸', schedule_task:'⏱', escalate:'⚑',
+  update_po:'#', update_customer:'☺', match_transactions:'⇄', billing_invoice_update:'▤', apply_credit_memo:'⊝'};
+
+$('planCount').textContent = M.proposedPlan.count + ' actions';
+
+function artifactHTML(kind, a){
+  switch(kind){
+    case 'send_email':
+      return `
+        <div class="fld"><label>To</label><input type="text" value="${esc((a.to||[]).join(', '))}"></div>
+        ${a.cc&&a.cc.length?`<div class="fld"><label>Cc</label><input type="text" value="${esc(a.cc.join(', '))}"></div>`:''}
+        <div class="fld"><label>Subject</label><input type="text" value="${esc(a.subject||'')}"></div>
+        <div class="fld"><label>Body</label><textarea>${esc(a.body||'')}</textarea></div>
+        ${a.attachments&&a.attachments.length?`<div class="fld"><label>Attachments</label><div class="att-chips">${a.attachments.map(at=>`<span class="att"><span class="ext">${esc(at.type)}</span>${esc(at.name)}</span>`).join('')}</div></div>`:''}`;
+    case 'schedule_task':
+      return `
+        <div class="fld"><label>Run at</label><input type="text" value="${esc(a.runAt||'')}"></div>
+        <div class="fld"><label>Prompt to the agent</label><textarea style="min-height:80px">${esc(a.prompt||'')}</textarea></div>`;
+    case 'update_po':
+      return `<div class="fld"><label>PO number${a.invoice?` · ${esc(a.invoice)}`:''}</label><input type="text" value="${esc(a.poNumber||'')}"></div>`;
+    case 'mark_pending':
+      return `<div class="fld"><label>Pause dunning on ${esc(a.invoice||'this invoice')}? (moves to pending)</label>
+        <div class="yesno"><div class="yn ${a.confirm?'on':''}" onclick="ynPick(this,1)">Yes, pause</div><div class="yn no ${a.confirm?'':'on'}" onclick="ynPick(this,0)">No</div></div></div>
+        ${a.note?`<div class="fld"><label>Note</label><input type="text" value="${esc(a.note)}"></div>`:''}`;
+    case 'update_customer':
+      return `
+        <div class="grid2">
+          <div class="fld"><label>Primary contact</label><input type="text" value="${esc(a.primaryContact?a.primaryContact.name:'')}"></div>
+          <div class="fld"><label>Contact email</label><input type="text" value="${esc(a.primaryContact?a.primaryContact.email:'')}"></div>
+        </div>
+        <div class="fld"><label>Billing address</label><input type="text" value="${esc(a.billingAddress||'')}"></div>
+        <div class="fld"><label>Shipping address <span class="muted">(optional)</span></label><input type="text" value="${esc(a.shippingAddress||'')}" placeholder="—"></div>`;
+    case 'match_transactions':
+      return `
+        <p class="muted" style="margin:0 0 10px">Confirm this match:</p>
+        <div class="kv"><span class="k">Transaction</span><span class="v">${esc(a.transactionId)} · ${esc(a.amount)}</span></div>
+        <div class="kv"><span class="k">Invoice</span><span class="v">${esc(a.invoice)}</span></div>
+        <div class="yesno" style="margin-top:11px"><div class="yn on" onclick="ynPick(this,1)">Confirm match</div><div class="yn no" onclick="ynPick(this,0)">Not a match</div></div>`;
+    case 'billing_invoice_update':
+      return `
+        <div class="grid2"><div class="fld"><label>Issue date</label><input type="text" value="${esc(a.issueDate||'')}"></div>
+        <div class="fld"><label>Due date</label><input type="text" value="${esc(a.dueDate||'')}"></div></div>
+        <div class="fld"><label>Line items · ${esc(a.invoice||'')}</label>
+        <table class="li-table"><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr></thead><tbody>
+        ${(a.lineItems||[]).map(li=>`<tr><td><input value="${esc(li.desc)}"></td><td style="width:48px"><input value="${esc(li.qty)}"></td><td style="width:90px"><input value="${esc(li.unitPrice)}"></td><td style="width:90px"><input value="${esc(li.amount)}"></td></tr>`).join('')}
+        </tbody></table></div>`;
+    case 'escalate':
+      return `
+        <div class="fld"><label>Flag type</label><input type="text" value="${esc(a.escType||a.reason||'')}"></div>
+        <div class="fld"><label>Reason / context for owner</label><textarea style="min-height:80px">${esc(a.reason||'')}</textarea></div>
+        <p class="muted">⚑ Routes to the account owner; nothing commercial is sent until they weigh in.</p>`;
+    case 'apply_credit_memo':
+      return `
+        <div class="grid2"><div class="fld"><label>Invoice</label><input type="text" value="${esc(a.invoice||'')}"></div>
+        <div class="fld"><label>Amount</label><input type="text" value="${esc(a.amount||'')}"></div></div>
+        <div class="fld"><label>Reason</label><input type="text" value="${esc(a.reason||'')}"></div>`;
+    default:
+      return `<p class="muted">No artifact.</p>`;
+  }
+}
+
+(function renderPlan(){
+  const wrap = $('planActions');
+  wrap.innerHTML = M.proposedPlan.actions.map((act,i)=>`
+    <div class="action" data-i="${i}" data-inv="${esc(act.invoice||'')}">
+      <div class="action-h" onclick="toggleAction(${i})">
+        <div class="kind-ic ${act.kind}">${KIND_IC[act.kind]||'•'}</div>
+        <div class="action-meta">
+          <div class="ttl">${esc(act.title)} ${act.invoice?`<span class="inv">${esc(act.invoice)}</span>`:''}</div>
+          <div class="dsc">${esc(act.desc)}</div>
+        </div>
+        <div class="toggles" onclick="event.stopPropagation()">
+          <button class="tg app active" onclick="setDecision(${i},'app')">Approve</button>
+          <button class="tg rej" onclick="setDecision(${i},'rej')">Reject</button>
+        </div>
+        <span class="chev">▶</span>
+      </div>
+      <div class="artifact">${artifactHTML(act.kind, act.artifact||{})}</div>
+    </div>`).join('');
+})();
+
+function toggleAction(i){
+  const el = document.querySelector(`.action[data-i="${i}"]`);
+  const wasOpen = el.classList.contains('open');
+  // selecting an action highlights it + filters the log to its invoice
+  document.querySelectorAll('.action').forEach(a=>a.classList.remove('sel'));
+  el.classList.toggle('open');
+  if(!wasOpen){
+    el.classList.add('sel');
+    const inv = el.getAttribute('data-inv');
+    if(inv) filterLog(inv);
+    // also load the editor into the work area
+    const i2 = +el.getAttribute('data-i');
+    const act = M.proposedPlan.actions[i2];
+    loadActionEditor(act);
+  }
+}
+function setDecision(i,d){
+  const el = document.querySelector(`.action[data-i="${i}"]`);
+  const app = el.querySelector('.tg.app'), rej = el.querySelector('.tg.rej');
+  if(d==='app'){app.classList.add('active');rej.classList.remove('active');el.classList.remove('rejected');}
+  else{rej.classList.add('active');app.classList.remove('active');el.classList.add('rejected');}
+}
+function ynPick(el,yes){
+  const grp = el.parentElement.querySelectorAll('.yn');
+  grp.forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+}
+function approveAll(){
+  document.querySelectorAll('.action').forEach((el,i)=>setDecision(i,'app'));
+}
+
+/* ---------- FUTURE (Next) ---------- */
+$('seqName').textContent = M.sequence.name;
+if(M.sequence.broken){
+  const b=$('seqBroken'); b.style.display='inline-block'; b.title=M.sequence.brokenReason; b.textContent='⚠ Broken';
+}
+(function renderFuture(){
+  const wrap = $('futureTiles');
+  const sorted = M.future.slice(); // already chronological enough; keep order
+  wrap.innerHTML = sorted.map((f,idx)=>{
+    const hidden = idx>0 ? 'future-hidden' : '';
+    const head = f.kind==='planned_email' ? esc(f.subject) : esc(f.prompt);
+    const meta = [];
+    if(f.invoice) meta.push(`<span class="pill">${esc(f.invoice)}</span>`);
+    if(f.kind==='planned_email'){ meta.push(`<span class="pill">${esc(f.sequenceStep)}</span>`); meta.push(esc(f.anchor)); meta.push('→ '+esc(f.to)); }
+    else meta.push(`<span class="pill">scheduled task</span>`);
+    return `<div class="future-tile ${hidden}">
+      <div class="ft-when">${esc(f.date)}<span>${esc(f.time)}</span></div>
+      <div class="ft-body"><div class="h">${head}</div><div class="m">${meta.join('')}</div></div>
+    </div>`;
+  }).join('');
+  if(sorted.length>1){
+    $('seeAllWrap').style.display='block';
+    $('seeAllLink').textContent = `See all ${sorted.length} scheduled (in settings) →`;
+  }
+})();
+function showAllFuture(){ document.querySelectorAll('.future-tile.future-hidden').forEach(e=>e.classList.remove('future-hidden')); $('seeAllWrap').style.display='none'; }
+
+/* ---------- WORK AREA ---------- */
+function loadActionEditor(act){
+  $('workTitle').textContent = act.title;
+  $('workSub').textContent = 'Editing proposed action · ' + (act.invoice||'');
+  $('workArea').innerHTML = `<div style="padding:16px 18px">
+    <span class="readonly-tag" style="background:#eaf2fd;color:#2476d8;border-color:#cfe1fa">Action editor</span>
+    <div style="font-size:13px;color:var(--helper);margin-bottom:12px">${esc(act.desc)}</div>
+    ${artifactHTML(act.kind, act.artifact||{})}
+    <div style="margin-top:14px;display:flex;gap:8px"><button class="btn primary" onclick="closeWork()">Save changes</button><button class="btn" onclick="closeWork()">Discard</button></div>
+  </div>`;
+}
+function senderLabel(e){
+  if(e.senderType==='customer') return `${e.senderName} – ${e.org}`;
+  if(e.senderType==='agent') return 'Agent';
+  if(e.senderType==='system') return 'System · ' + (e.systemKind==='dunning'?'Dunning':e.systemKind);
+  if(e.senderType==='merchant') return M.merchant.name;
+  return e.senderName||'Unknown';
+}
+function openEmail(idx){
+  const e = M.happened[idx];
+  if(!e || e.kind!=='email') return;
+  // thread = other emails on the same invoice
+  const thread = M.happened
+    .map((x,i)=>({x,i}))
+    .filter(o=>o.x.kind==='email' && o.x.invoice===e.invoice && o.i!==idx);
+  $('workTitle').textContent = 'Email';
+  $('workSub').textContent = e.invoice ? ('Thread · '+e.invoice) : '';
+  $('workArea').innerHTML = `
+    <div class="email-view">
+      <span class="readonly-tag">Read-only</span>
+      <div class="ev-h">
+        <div class="ev-subj">${esc(e.subject)}</div>
+        <div class="ev-row"><span class="lab">From</span><span><b>${esc(senderLabel(e))}</b> <span class="ev-chip ${e.direction}">${e.direction==='in'?'received':'sent'}</span></span></div>
+        <div class="ev-row"><span class="lab">When</span><span>${esc(e.date)} · ${esc(e.time)}</span></div>
+        ${e.invoice?`<div class="ev-row"><span class="lab">Invoice</span><span>${esc(e.invoice)}</span></div>`:''}
+      </div>
+      <div class="ev-body">${esc(e.body||e.preview||'')}</div>
+      ${thread.length?`<div class="thread"><h4>Rest of this thread (${thread.length})</h4>
+        ${thread.map(o=>`<div class="titem" onclick="openEmail(${o.i})" style="cursor:pointer"><b>${esc(senderLabel(o.x))}</b> — ${esc(o.x.subject)} <span style="float:right">${esc(o.x.date)}</span></div>`).join('')}</div>`:''}
+    </div>`;
+  // highlight clicked row & ensure log open
+  if(!$('logTab').classList.contains('open')) toggleLog();
+}
+function closeWork(){
+  $('workTitle').textContent='Work area';
+  $('workSub').textContent='Pick an email from the activity log, or open an action to edit it';
+  $('workArea').innerHTML=`<div class="work-empty"><div class="big">✉</div><div>Nothing open yet.</div><div style="font-size:12.5px;margin-top:4px">Click an email in the activity log below, or expand a proposed action.</div></div>`;
+}
+
+/* ---------- ACTIVITY LOG ---------- */
+const EVENT_LABEL = {
+  payment_failed:'Payment failed', ptp_logged:'Promise to pay logged', agent_executed:'Agent acted',
+  payment_applied:'Payment applied', invoice_overdue:'Invoice overdue'
+};
+$('logCount').textContent = M.happened.length + ' events';
+(function renderLog(){
+  const wrap = $('logRows');
+  wrap.innerHTML = M.happened.map((e,i)=>{
+    if(e.kind==='email'){
+      const cls = e.senderType;
+      const icCls = e.senderType==='customer'?'customer':e.senderType==='agent'?'agent':'system';
+      const tags = [];
+      tags.push(`<span class="lr-tag ${e.direction==='in'?'received':'sent'}">${e.direction==='in'?'received':'sent'}</span>`);
+      if(e.invoice) tags.push(`<span class="lr-tag inv">${esc(e.invoice)}</span>`);
+      if(e.flags){ if(e.flags.opened) tags.push(`<span class="lr-tag badge">opened</span>`); if(e.flags.clicked) tags.push(`<span class="lr-tag badge">clicked</span>`); }
+      return `<div class="logrow email" data-inv="${esc(e.invoice||'')}" onclick="openEmail(${i})">
+        <div class="lr-when"><b>${esc(e.date)}</b>${esc(e.time)}</div>
+        <div class="lr-ic ${icCls}">✉</div>
+        <div class="lr-main">
+          <div class="top"><span class="sender">${esc(senderLabel(e))}</span>${tags.join('')}</div>
+          <div class="sub">${esc(e.subject)}</div>
+          <div class="prev">${esc(e.preview||'')}</div>
+        </div>
+      </div>`;
+    } else {
+      const detail = e.details || e.reasonText || '';
+      const amt = e.amount?` · ${esc(e.amount)}`:'';
+      const rc = e.reasonCode?` (${esc(e.reasonCode)})`:'';
+      return `<div class="logrow" data-inv="${esc(e.invoice||'')}">
+        <div class="lr-when"><b>${esc(e.date)}</b>${esc(e.time)}</div>
+        <div class="lr-ic event">●</div>
+        <div class="lr-main">
+          <div class="top"><span class="sender">${esc(EVENT_LABEL[e.kind]||e.kind)}${rc}</span>${e.invoice?`<span class="lr-tag inv">${esc(e.invoice)}</span>`:''}</div>
+          <div class="sub">${esc(detail)}${amt}</div>
+        </div>
+      </div>`;
+    }
+  }).join('');
+})();
+function toggleLog(){ $('logTab').classList.toggle('open'); }
+let activeFilter = null;
+function filterLog(inv){
+  activeFilter = inv;
+  $('filterBar').classList.add('show');
+  $('filterInv').textContent = inv;
+  document.querySelectorAll('#logRows .logrow').forEach(r=>{
+    r.classList.toggle('dim', r.getAttribute('data-inv')!==inv);
+  });
+}
+function clearFilter(){
+  activeFilter=null;
+  $('filterBar').classList.remove('show');
+  document.querySelectorAll('#logRows .logrow').forEach(r=>r.classList.remove('dim'));
+}
+
+/* ---------- control-panel levers ---------- */
+let st = {agent:M.controls.agentPaused, dunning:M.controls.dunningPaused, esc:M.controls.escalated};
+function paintLevers(){
+  const d=$('leverDunning'); d.classList.toggle('on', st.dunning);
+  $('dunLabel').textContent = st.dunning?'Dunning paused':'Dunning active';
+  const a=$('leverAgent'); a.classList.toggle('on', st.agent);
+  $('agtLabel').textContent = st.agent?'Agent paused':'Agent on';
+  $('leverEsc').classList.toggle('on', st.esc);
+}
+function toggleDunning(){ st.dunning=!st.dunning; paintLevers();
+  if(st.dunning){ /* holds + moves invoice to pending */ } }
+function toggleAgent(){ st.agent=!st.agent; paintLevers(); }
+function toggleEsc(){ st.esc=!st.esc; paintLevers(); }
+paintLevers();
+
+/* ---------- compose / policy / learn overlays ---------- */
+function openCompose(){ $('scrim').classList.add('show'); $('composeModal').classList.add('show'); }
+function openPolicy(){ $('scrim').classList.add('show'); $('policyDrawer').classList.add('show'); }
+function openLearn(){ $('scrim').classList.add('show'); $('learnDrawer').classList.add('show'); }
+function closeAll(){
+  $('scrim').classList.remove('show');
+  ['composeModal','policyDrawer','learnDrawer'].forEach(id=>$(id).classList.remove('show'));
+}
+
+/* learn-more deep view */
+(function buildLearn(){
+  const ci = M.customerInsights;
+  const invSnap = M.invoices.map(iv=>`<div class="ic"><div class="n">${esc(iv.amount)}</div><div class="l">${esc(iv.number)} <span class="st ${iv.status}">${esc(iv.status)}</span></div></div>`).join('');
+  const kanban = ci.fromKanban.map(k=>`<div class="kv"><span class="k">${esc(k.label)}</span><span class="v">${esc(k.value)}</span></div>`).join('');
+  const reports = ci.fromReports.map(r=>`<div class="kv"><span class="k">${esc(r.label)}</span><span class="v">${esc(r.value)}</span></div>`).join('');
+  const c = ci.companyInfo;
+  const info = Object.entries({Legal:c.legalName,Tax:c.tax,Address:c.address,Terms:c.terms,Contact:c.primaryContact})
+    .map(([k,v])=>`<div class="kv"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join('');
+  const exChips = M.nl.discoveryExamples.map(q=>`<button class="ex-chip" onclick="askChat('${esc(q).replace(/'/g,"")}')">${esc(q)}</button>`).join('');
+  $('learnBody').innerHTML = `
+    <div class="sect"><h3>Invoice snapshot</h3><div class="insnap">${invSnap}</div></div>
+    <div class="sect"><h3>Customer insights · behavior</h3>${kanban}</div>
+    <div class="sect"><h3>Customer insights · financials</h3>${reports}</div>
+    <div class="sect"><h3>Ask the agent about this customer</h3>
+      <div class="chatlog" id="chatLog"></div>
+      <div class="ex-chips">${exChips}</div>
+      <div class="chat-row"><input id="chatIn" placeholder="Ask anything about ${esc(M.customer.name)}…"><button onclick="askChat()">Ask</button></div>
+    </div>
+    <div class="sect"><h3>Company info</h3>${info}</div>`;
+})();
+function askChat(preset){
+  const inp=$('chatIn');
+  const q = preset!==undefined ? preset : (inp?inp.value.trim():'');
+  if(!q) return;
+  const log=$('chatLog');
+  log.insertAdjacentHTML('beforeend', `<div class="bubble me">${esc(q)}</div><div class="bubble ag">Looking through ${esc(M.customer.name)}'s history… (discovery surface — answers would be grounded in the activity log, reports, and CRM.)</div>`);
+  if(inp && preset===undefined) inp.value='';
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ---------- handoff ---------- */
+function sendHandoff(){
+  const inp=$('handoffInput'); const v=inp.value.trim(); if(!v) return;
+  inp.value=''; inp.placeholder='Sent to agent — it will re-plan. Add another instruction…';
+}
+$('handoffInput').setAttribute('placeholder', M.nl.handoffPlaceholder);
+
+/* ---------- artifact gallery ---------- */
+(function buildGallery(){
+  const pane=$('galleryPane');
+  pane.innerHTML = M.actionCatalog.map((c,i)=>`
+    <div class="gal-item" data-g="${i}">
+      <div class="gal-h" onclick="toggleGal(${i})">
+        <div class="kind-ic ${c.kind}">${KIND_IC[c.kind]||'•'}</div>
+        <div><div style="font-weight:600">${esc(c.title)}</div><div class="muted">${esc(c.kind)}</div></div>
+        <span class="pat">${esc(c.uiPattern)}</span>
+        <span class="chev">▶</span>
+      </div>
+      <div class="gal-b">${artifactHTML(c.kind, c.artifact||{})}</div>
+    </div>`).join('');
+})();
+function toggleGal(i){ document.querySelector(`.gal-item[data-g="${i}"]`).classList.toggle('open'); }
+function showGallery(){ $('galleryPane').style.display='block'; $('aboutPane').style.display='none'; $('tabGalleryBtn').classList.add('active'); $('tabAboutBtn').classList.remove('active'); }
+function hideGallery(){ $('galleryPane').style.display='none'; $('aboutPane').style.display='block'; $('tabAboutBtn').classList.add('active'); $('tabGalleryBtn').classList.remove('active'); }
+</script>
+</body>
+</html>
