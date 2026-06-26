@@ -66,6 +66,17 @@ Sending the W-9 and updating the contact are both low-risk actions that should u
     { kind:"escalated",       date:"Jun 3, 2026",  time:"2:30 PM",  text:"Agent marked customer as escalated: customer threatened to churn", agent:true },
     { kind:"invoice_voided",  date:"Jun 4, 2026",  time:"9:15 AM",  text:"INV-2242 voided (duplicate)", agent:true },
   ],
+  scheduled: [
+    { type:"agent_task", id:"st1", date:"Jun 10, 2026", time:"9:00 AM",
+      prompt:"Re-check if INV-2241 has been paid. If not and there has been no customer reply, send the next dunning follow-up. If they replied, re-plan." },
+    { type:"dunning", id:"d1", date:"Jun 12, 2026", time:"8:00 AM",
+      step:"Reminder 2 of 4", to:"finance@meridiangroup.com", subject:"Following up — invoice INV-2241 still outstanding" },
+    { type:"dunning", id:"d2", date:"Jun 19, 2026", time:"8:00 AM",
+      step:"Reminder 3 of 4", to:"finance@meridiangroup.com", subject:"INV-2241 — please remit" },
+    { type:"dunning", id:"d3", date:"Jun 26, 2026", time:"8:00 AM",
+      step:"Final notice", to:"finance@meridiangroup.com", subject:"Final notice — INV-2241" },
+  ],
+
   // events that triggered these agent actions — email IDs or inline event objects
   newEvents: [
     { type:"email", id:"e3a" },
@@ -159,6 +170,9 @@ let threadOpenEmails = new Set();
 let expandedHeaders = new Set();
 let showBcc = false;
 let attachPickerOpen = false;
+// scheduled tab state
+let editingTask = null;       // task id being edited
+let deletedTasks = new Set(); // task ids deleted this session
 let recipientPills = {}; // {actionIdx: {to:[...], cc:[...]}}
 let openNewEvents = new Set(); // which new-event email IDs are expanded
 
@@ -572,6 +586,7 @@ function renderDetailHeader(){
     <nav class="tabs">
       <button class="tab ${activeTab==="actions"?"active":""}" data-tab="actions">Agent Actions${pendingCount>0?`<span class="tab-dot"></span>`:""}</button>
       <button class="tab ${activeTab==="activity"?"active":""}" data-tab="activity">Activity</button>
+      <button class="tab ${activeTab==="scheduled"?"active":""}" data-tab="scheduled">Scheduled</button>
     </nav>`;
 }
 
@@ -847,11 +862,77 @@ function renderActivityPanel(){
 }
 
 // ============================================================
+//  SCHEDULED PANEL
+// ============================================================
+function renderScheduledPanel(){
+  const all = (SCENARIO.scheduled||[]).sort((a,b)=>toMs(a.date,a.time)-toMs(b.date,b.time));
+  const tasks = all.filter(s=>s.type==="agent_task" && !deletedTasks.has(s.id));
+  const nextDunning = all.find(s=>s.type==="dunning");
+
+  const dunningNote = nextDunning
+    ? `<span style="font-size:12px;color:var(--helper)">Next dunning reminder: <strong style="color:var(--ink)">${esc(nextDunning.date)}</strong> &nbsp;·&nbsp; <span class="sched-settings-link">Global dunning settings →</span></span>`
+    : `<span class="sched-settings-link" style="font-size:12px">Global dunning settings →</span>`;
+
+  let html = `<div class="sched-header">
+    <h3>Scheduled</h3>
+    <div>${dunningNote}</div>
+  </div>`;
+
+  if(!tasks.length){
+    return html + `<div class="empty">No agent scheduled tasks.</div>`;
+  }
+
+  tasks.forEach(s=>{
+    const isEditing = editingTask===s.id;
+    const preview = s.prompt.replace(/\s+/g," ").trim();
+    const editForm = isEditing ? `
+      <div class="sched-task-form">
+        <div class="stf-row">
+          <span class="stf-label">Date / time</span>
+          <input class="stf-input" id="stf-date-${s.id}" value="${esc(s.date)} · ${esc(s.time)}">
+        </div>
+        <div class="stf-row" style="align-items:flex-start">
+          <span class="stf-label">Prompt</span>
+          <textarea class="stf-textarea" id="stf-prompt-${s.id}">${esc(s.prompt)}</textarea>
+        </div>
+        <div class="stf-actions">
+          <span class="stf-delete" data-delete-task="${s.id}">Delete task</span>
+          <div class="stf-tiny">
+            <span data-cancel-task="${s.id}">Cancel</span>
+            <span data-save-task="${s.id}">Save</span>
+          </div>
+        </div>
+      </div>` : "";
+    html+=`<div class="sched-tile">
+      <div class="sched-tile-head">
+        <div class="sched-tile-left">
+          <div class="sched-tile-when">${esc(s.date)} · ${esc(s.time)}</div>
+          <div class="sched-tile-title">Agent scheduled task</div>
+          <div class="sched-tile-body" style="padding:4px 0 0;font-size:13px;color:var(--ink)">${esc(preview)}</div>
+        </div>
+        <span class="ent-strip agent" style="flex:0 0 auto;margin-top:2px">Agent</span>
+      </div>
+      <div class="sched-tile-foot">
+        <span class="sf-note"></span>
+        ${isEditing?"":
+          `<button class="btn" data-edit-task="${s.id}" style="padding:5px 12px;font-size:12.5px">Edit</button>
+           <button class="btn" data-delete-task="${s.id}" style="padding:5px 12px;font-size:12.5px;color:var(--warn)">Delete</button>`}
+      </div>
+      ${editForm}
+    </div>`;
+  });
+
+  return html;
+}
+
+// ============================================================
 //  PANEL + WIRING
 // ============================================================
 function renderPanel(){
   const p = $("panel"); if(!p) return;
-  p.innerHTML = activeTab==="actions" ? renderActionsPanel() : renderActivityPanel();
+  p.innerHTML = activeTab==="actions" ? renderActionsPanel()
+    : activeTab==="activity" ? renderActivityPanel()
+    : renderScheduledPanel();
   wire();
 }
 
@@ -884,6 +965,10 @@ function wire(){
     if(recipientPills[idx]) recipientPills[idx][field]=recipientPills[idx][field].filter(x=>x!==email);
     renderPanel();
   });
+  p.querySelectorAll("[data-edit-task]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); editingTask=el.dataset.editTask; renderPanel(); });
+  p.querySelectorAll("[data-cancel-task]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); editingTask=null; renderPanel(); });
+  p.querySelectorAll("[data-save-task]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); editingTask=null; renderPanel(); });
+  p.querySelectorAll("[data-delete-task]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); deletedTasks.add(el.dataset.deleteTask); editingTask=null; renderPanel(); });
   p.querySelectorAll("[data-cancel-draft]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); expandedCard=null; renderPanel(); });
   p.querySelectorAll("[data-save-draft]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); expandedCard=null; renderPanel(); });
   p.querySelectorAll("[data-open-picker]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); attachPickerOpen=attachPickerOpen===el.dataset.openPicker?false:el.dataset.openPicker; renderPanel(); });
