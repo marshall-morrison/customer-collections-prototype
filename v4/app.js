@@ -159,7 +159,7 @@ const THREADS = [
 // ============================================================
 //  ROUTING STATE
 // ============================================================
-let view = "inbox";
+let view = "inbox";  // "inbox" | "detail" | "customer" | "billing"
 let filterOpen = false;
 let agentPanelOpen = false;
 let activeTab = "actions";
@@ -221,7 +221,7 @@ function renderNav(){
       <span class="ni-chev">${invoicingOpen?"↓":"›"}</span>
     </div>
     ${invoicingOpen?`
-      <div class="nav-sub">Billing</div>
+      <div class="nav-sub${view==="billing"?" active":""}" data-nav-billing style="cursor:pointer">Billing</div>
       <div class="nav-sub">Kanban</div>
       <div class="nav-sub">Credit memos</div>
     `:""}
@@ -239,6 +239,7 @@ function renderNav(){
   if(nc) nc.onclick = ()=>{ view="customer"; render(); };
   const ti = $("rail-nav").querySelector("[data-toggle-invoicing]");
   if(ti) ti.onclick = ()=>{ invoicingOpen=!invoicingOpen; renderNav(); };
+  $("rail-nav").querySelectorAll("[data-nav-billing]").forEach(el=>el.onclick=()=>{ view="billing"; render(); });
   $("rail-nav").querySelectorAll("[data-nav-inbox]").forEach(el=>el.onclick=()=>{ view="inbox"; render(); });
 }
 
@@ -292,6 +293,94 @@ function renderCustomer(){
             ${link("Additional fields","Department ID, Project name, Sales rep, etc.")}
             ${link("Taxes","Tax exemption status, VAT number, EIN")}
           </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+//  BILLING / INVOICE PAGE
+// ============================================================
+function renderBilling(){
+  const field = (label, val) =>
+    `<div class="inv-field"><span class="if-label">${label}</span><span class="if-val">${val}</span></div>`;
+
+  return `
+    <div class="crumb">Invoicing <span>›</span> Billing <span>›</span> <b>Invoice</b></div>
+    <div class="inv-page">
+      <div class="inv-page-notice">Accounting period closed as of <strong>May 31, 2026</strong></div>
+
+      <div style="display:flex;align-items:flex-start;margin-bottom:20px">
+        <div style="flex:1">
+          <div class="inv-page-title">
+            <h1>Invoice #INV-2241</h1>
+            <span class="inv-status-chip overdue">Overdue</span>
+          </div>
+          <div class="inv-page-id">⎘ INV-2241</div>
+        </div>
+        <div class="inv-page-actions">
+          <button class="btn" id="collAgentBtn" style="padding:7px 14px;font-size:13px;display:inline-flex;align-items:center;gap:6px">Collections Agent${SCENARIO.proposed.length>0?`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:#e8333a;color:#fff;font-size:11px;font-weight:700;padding:0 4px">${SCENARIO.proposed.length}</span>`:""}</button>
+          <button class="btn" style="padding:7px 12px;font-size:15px">⋯</button>
+          <button class="btn" style="padding:7px 14px;font-size:13px">Activity Feed</button>
+          <button class="btn" style="padding:7px 14px;font-size:13px">✉ Send reminder</button>
+          <button class="btn" style="padding:7px 16px;font-size:13px;background:var(--blue);color:#fff;border-color:var(--blue)">⊞ Record payment</button>
+        </div>
+      </div>
+
+      <div class="inv-section">
+        <h2>Summary</h2>
+        <div style="display:flex;gap:0">
+          <div style="flex:1">
+            ${field("Customer","<a>Meridian Group</a>")}
+            ${field("Invoice number","INV-2241")}
+            ${field("Invoice date","May 16, 2026")}
+            ${field("Net terms","Net 30")}
+            ${field("Send date","May 16, 2026")}
+            ${field("Due date","Jun 1, 2026")}
+          </div>
+          <div class="inv-divider"></div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;margin-bottom:10px;color:var(--ink)">Billing info</div>
+            ${field("Billing email(s)","finance@meridiangroup.com")}
+            ${field("Address","Meridian Group, Inc.<br>500 Howard St<br>San Francisco, CA 94105<br>US")}
+            ${field("CC email(s)","ap@meridiangroup.com")}
+            <div style="margin-top:16px;font-size:14px;font-weight:700;margin-bottom:10px;color:var(--ink)">Shipping info</div>
+            ${field("Shipping address","—")}
+          </div>
+        </div>
+      </div>
+
+      <div class="inv-section">
+        <h2>Invoice line items</h2>
+        <table class="inv-items-table">
+          <thead>
+            <tr>
+              <th style="width:35%">Name</th>
+              <th style="width:15%">Integration item</th>
+              <th>Service period</th>
+              <th class="r" style="width:60px">Qty</th>
+              <th class="r" style="width:100px">Unit price</th>
+              <th class="r" style="width:110px">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div style="font-weight:600">Platform subscription — May 2026</div>
+                <div style="font-size:12px;color:var(--helper);margin-top:2px">Recurring</div>
+              </td>
+              <td style="color:var(--helper)">SaaS</td>
+              <td style="color:var(--helper)">May 16, 2026 – Jun 15, 2026</td>
+              <td class="r">1</td>
+              <td class="r">$10,890.00</td>
+              <td class="r">$10,890.00</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="inv-totals">
+          <span class="it-label">Subtotal:</span><span class="it-val">$10,890.00</span>
+          <span class="it-label">Tax:</span><span class="it-val">$0.00</span>
+          <span class="it-label it-total">Total:</span><span class="it-val it-total">$10,890.00</span>
         </div>
       </div>
     </div>`;
@@ -1064,7 +1153,11 @@ function render(){
   const agentTab = $("agentTab");
   if(agentTab) agentTab.onclick = ()=>{ agentPanelOpen=!agentPanelOpen; syncAgentPanel(); };
   const main = $("main-content");
-  if(view==="customer"){
+  if(view==="billing"){
+    main.innerHTML = renderBilling();
+    const cab = $("collAgentBtn");
+    if(cab) cab.onclick=()=>{ view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null; threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set(); expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false; openNewEvents=new Set(); recipientPills={}; agentEscalated=false; agentPaused=false; activeTab="actions"; render(); };
+  } else if(view==="customer"){
     main.innerHTML = renderCustomer();
     main.querySelectorAll("[data-nav-to-detail]").forEach(el=>el.onclick=()=>{
       view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null;

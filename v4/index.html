@@ -17,15 +17,16 @@
   svg{display:block;}
 
   /* ===== AGENT CHAT SIDE PANEL ===== */
-  .agent-side{position:fixed;right:0;top:0;bottom:0;z-index:100;pointer-events:none;}
-  /* the tab button */
-  .agent-tab{position:absolute;right:0;top:50%;transform:translateY(-50%);background:#67e8f9;border-radius:10px 0 0 10px;padding:16px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;color:#0d1117;pointer-events:all;transition:right .25s ease;}
+  .agent-side{flex:0 0 0;position:relative;overflow:visible;}
+  .agent-side.open{}
+  /* floating tab — fixed to viewport so it never bounces */
+  .agent-tab{position:fixed;right:0;top:50vh;transform:translateY(-50%);background:#67e8f9;border-radius:10px 0 0 10px;padding:22px 10px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#0d1117;box-shadow:-2px 0 8px rgba(0,0,0,.1);z-index:101;transition:right .25s ease;}
   .agent-side.open .agent-tab{right:340px;}
   .agent-tab .at-label{writing-mode:vertical-rl;transform:rotate(180deg);font-size:13px;font-weight:700;letter-spacing:.3px;white-space:nowrap;}
   /* the dark panel */
-  .agent-panel{position:absolute;top:0;right:-340px;width:340px;height:100%;background:#0d1117;color:#fff;display:flex;flex-direction:column;overflow:hidden;transition:right .25s ease;pointer-events:all;}
+  .agent-panel{position:fixed;top:0;right:-340px;width:340px;height:100vh;background:#0d1117;color:#fff;display:flex;flex-direction:column;overflow:hidden;transition:right .25s ease;z-index:100;}
   .agent-side.open .agent-panel{right:0;}
-  .ap-header{display:flex;align-items:center;gap:10px;padding:16px 16px 14px;border-bottom:1px solid #1e2a3a;}
+  .ap-header{display:flex;align-items:center;gap:10px;padding:16px;border-bottom:1px solid #1e2a3a;}
   .ap-header .ap-icon{width:32px;height:32px;background:#67e8f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#0d1117;}
   .ap-header .ap-title{font-size:15px;font-weight:700;}
   .ap-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;text-align:center;}
@@ -95,6 +96,36 @@
   .stf-tiny span{cursor:pointer;} .stf-tiny span:hover{color:var(--ink);}
   .stf-delete{font-size:12px;color:var(--warn);cursor:pointer;}
   .stf-delete:hover{text-decoration:underline;}
+
+  /* ===== BILLING / INVOICE PAGE ===== */
+  .inv-page{padding:0 32px 48px;}
+  .inv-page-notice{font-size:13px;color:var(--helper);padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:20px;}
+  .inv-page-notice strong{color:var(--ink);}
+  .inv-page-title{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+  .inv-page-title h1{font-size:22px;font-weight:700;margin:0;}
+  .inv-status-chip{font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;border:1px solid var(--line);color:var(--helper);}
+  .inv-status-chip.overdue{border-color:#f4a261;color:#c05e00;background:#fff5eb;}
+  .inv-page-id{font-size:12.5px;color:var(--helper);margin-bottom:16px;}
+  .inv-page-actions{display:flex;gap:8px;margin-left:auto;}
+  .inv-section{background:#fff;border:1px solid var(--line);border-radius:10px;padding:22px 24px;margin-bottom:20px;}
+  .inv-section h2{font-size:16px;font-weight:700;margin:0 0 18px;}
+  .inv-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 40px;}
+  .inv-field{display:grid;grid-template-columns:140px 1fr;gap:4px 12px;padding:6px 0;border-bottom:1px solid var(--line2);align-items:baseline;}
+  .inv-field:last-child{border-bottom:none;}
+  .inv-field .if-label{font-size:13px;color:var(--helper);}
+  .inv-field .if-val{font-size:13px;color:var(--ink);}
+  .inv-field .if-val a{color:var(--blue);text-decoration:none;}
+  .inv-divider{width:1px;background:var(--line);margin:0 20px;}
+  /* line items table */
+  .inv-items-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .inv-items-table th{text-align:left;padding:8px 0;border-bottom:2px solid var(--line);font-size:12px;font-weight:700;color:var(--helper);}
+  .inv-items-table th.r,.inv-items-table td.r{text-align:right;}
+  .inv-items-table td{padding:12px 0;border-bottom:1px solid var(--line2);vertical-align:top;}
+  .inv-items-table tr:last-child td{border-bottom:none;}
+  .inv-totals{margin-top:16px;display:grid;grid-template-columns:1fr auto;gap:4px 24px;font-size:13px;max-width:360px;margin-left:auto;}
+  .inv-totals .it-label{color:var(--helper);text-align:right;}
+  .inv-totals .it-val{text-align:right;}
+  .inv-totals .it-total{font-weight:700;color:var(--ink);}
 
   /* ===== CUSTOMER PAGE ===== */
   .cust-page{padding:28px 32px;}
@@ -431,9 +462,7 @@
 
   <main class="main" id="main-content"></main>
   <div class="agent-side" id="agentSide">
-    <div class="agent-tab" id="agentTab">
-      <span class="at-label">Talk to your agent</span>
-    </div>
+    <div class="agent-tab" id="agentTab"><span class="at-label">Talk to your agent</span></div>
     <div class="agent-panel">
       <div class="ap-header">
         <div class="ap-icon">⚡</div>
