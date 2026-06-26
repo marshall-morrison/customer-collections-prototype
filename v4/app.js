@@ -30,13 +30,14 @@ const WORKLIST = [
   {
     id: "meridian",
     customer: "Meridian Group",
-    invoices: ["INV-2241"],
+    invoices: ["INV-2241","INV-2243"],
+    outstandingAmt: 15890,
     overdueAmt: 10890,
     eventSummary: "Dana requested a W-9 and billing contact update before processing payment",
     proposedActions: ["Send email","Update primary billing contact"],
     escalated: false,
     planStatus: "review",
-    ageDays: 3,
+    lastEvent: "Jun 4, 2026",
   },
 ];
 
@@ -48,7 +49,7 @@ INV-2241 for **$10,890** is 21 days past due — the prior dunning reminder was 
 
 Sending the W-9 and updating the contact are both low-risk actions that should unblock payment. Holding on next dunning steps until these are resolved.`,
   invoices: [
-    { num:"INV-2241", sent:"May 16, 2026", due:"Jun 1, 2026", amount:10890, od:21 },
+    { num:"INV-2241", due:"Jun 1, 2026", amount:10890, od:21, status:"Overdue" },
   ],
   events: [
     { kind:"invoice_aged",    date:"Apr 25, 2026", time:"12:00 AM", text:"INV-2241 crossed 30 days past due — $10,890", agent:false },
@@ -159,6 +160,8 @@ const THREADS = [
 //  ROUTING STATE
 // ============================================================
 let view = "inbox";
+let filterOpen = false;
+let agentPanelOpen = false;
 let activeTab = "actions";
 // detail state
 let actionState = {};
@@ -304,30 +307,41 @@ function renderInbox(){
   const rows = WORKLIST.map(r=>{
     const invTags = r.invoices.map(i=>`<span class="inv-tag">${esc(i)}</span>`).join("");
     const statusChip = `<span class="plan-chip ${r.planStatus}">${statusLabel[r.planStatus]||r.planStatus}</span>`;
-    const escDot = r.escalated ? `<span title="Escalated" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#e07c2a;margin-left:7px;vertical-align:middle"></span>` : "";
+    const flagIcon = `<span style="display:inline-block;width:13px;height:13px;margin-right:6px;vertical-align:middle;opacity:${r.escalated?1:.2}">${r.escalated?ICON.flagFill:ICON.flagOut}</span>`;
     const actLine = r.proposedActions.map(a=>`<div style="font-size:12.5px;color:var(--ink);margin-bottom:2px">${esc(a)}</div>`).join("");
     return `<tr data-customer="${r.id}" style="${r.escalated?"border-left:3px solid #e07c2a":""}">
-      <td><span class="cust-name">${esc(r.customer)}</span>${escDot}</td>
+      <td style="white-space:nowrap">${flagIcon}<span class="cust-name">${esc(r.customer)}</span></td>
       <td>${invTags}</td>
+      <td style="font-size:13px">${fmtMoney(r.outstandingAmt||r.overdueAmt)}</td>
       <td><span class="overdue-amt">${fmtMoney(r.overdueAmt)}</span></td>
-      <td style="font-size:12.5px;color:var(--helper);max-width:280px;line-height:1.45">${esc(r.eventSummary)}</td>
+      <td style="font-size:12.5px;color:var(--helper);max-width:220px;line-height:1.45">${esc(r.eventSummary)}</td>
       <td>${actLine}</td>
       <td>${statusChip}</td>
-      <td class="r"><span class="age-num">${r.ageDays}d</span></td>
+      <td style="font-size:12.5px;color:var(--helper);white-space:nowrap">${esc(r.lastEvent||"")}</td>
     </tr>`;
   }).join("");
+
+  const filterDropdown = filterOpen ? `<div class="filter-dropdown">
+    <div class="filter-option"><span>Latest status</span><span class="fo-chev">›</span></div>
+    <div class="filter-option"><span>Escalation</span><span class="fo-chev">›</span></div>
+    <div class="filter-option"><span>Total overdue</span><span class="fo-chev">›</span></div>
+    <div class="filter-option"><span>Invoice due date</span><span class="fo-chev">›</span></div>
+    <div class="filter-option"><span>Last event</span><span class="fo-chev">›</span></div>
+    <div class="filter-option"><span>Customer</span><span class="fo-chev">›</span></div>
+  </div>` : "";
+
   return `
     <div class="crumb">Invoicing <span>›</span> <b>Collections Inbox</b></div>
     <div class="inbox-wrap">
-      <div class="inbox-head"><h1>Collections Inbox</h1></div>
+      <div class="inbox-head">
+        <h1>Collections Inbox</h1>
+      </div>
       ${(()=>{
         const n = WORKLIST.filter(r=>r.planStatus==="review").length;
-        const openLabel = n===1 ? "customer with open agent actions to close out" : "customers with open agent actions to close out";
-        const dot = n>0 ? `<span class="stat-dot-tr tab-dot"></span>` : "";
+        const openLabel = n===1 ? "customer with open agent actions to review" : "customers with open agent actions to review";
         return `<div class="stat-strip">
           <div class="stat-box">
-            ${dot}
-            <div class="stat-num ${n===0?"zero":""}">${n}</div>
+            <div class="stat-num ${n===0?"zero":""}" style="${n>0?"color:#e8333a":""}">${n}</div>
             <div class="stat-label">${openLabel}</div>
           </div>
           <div class="stat-box">
@@ -336,10 +350,14 @@ function renderInbox(){
           </div>
         </div>`;
       })()}
+      <div style="margin-bottom:12px;position:relative;display:inline-block">
+        <button class="filter-btn" id="filterBtn">☰ Add filter</button>
+        ${filterDropdown}
+      </div>
       <table class="inbox-table">
         <thead><tr>
-          <th>Customer</th><th>Open invoices</th><th>Total overdue</th>
-          <th>Event</th><th>Agent actions</th><th>Plan status</th><th class="r">Age</th>
+          <th>Customer</th><th>Open invoices</th><th>Total outstanding</th><th>Total overdue</th>
+          <th>Event</th><th>Agent actions</th><th>Latest status</th><th>Agent triggered</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -620,16 +638,16 @@ function renderDetailHeader(){
       <div class="right">
         <div class="inv-h">Outstanding Invoices</div>
         <table class="inv">
-          <thead><tr><th>Invoice #</th><th>Sent</th><th>Due</th><th class="r">Amount</th></tr></thead>
+          <thead><tr><th>Invoice #</th><th>Due</th><th>Status</th><th class="r">Amount</th></tr></thead>
           <tbody>
-            <tr><td><a>${esc(inv.num)}</a></td><td>${esc(inv.sent)}</td><td>${esc(inv.due)}${chip}</td><td class="r">${amt}</td></tr>
+            <tr><td><a>${esc(inv.num)}</a></td><td>${esc(inv.due)}${chip}</td><td style="font-size:12.5px;color:var(--helper)">${esc(inv.status||"")}</td><td class="r">${amt}</td></tr>
             <tr class="tot"><td colspan="3">Total Outstanding</td><td class="r">${amt}</td></tr>
           </tbody>
         </table>
       </div>
     </section>
     <nav class="tabs">
-      <button class="tab ${activeTab==="actions"?"active":""}" data-tab="actions">Agent Actions${pendingCount>0?`<span class="tab-dot"></span>`:""}</button>
+      <button class="tab ${activeTab==="actions"?"active":""}" data-tab="actions">Actions${pendingCount>0?`<span class="tab-dot"></span>`:""}</button>
       <button class="tab ${activeTab==="activity"?"active":""}" data-tab="activity">Activity</button>
       <button class="tab ${activeTab==="scheduled"?"active":""}" data-tab="scheduled">Scheduled</button>
     </nav>`;
@@ -643,29 +661,30 @@ function renderNewEventsZone(){
   if(!defs.length) return "";
   const allEmails = THREADS.flatMap(t=>t.emails.map(e=>({...e,threadId:t.id})));
 
-  // resolve and sort chronologically
+  // resolve oldest first — tells the story in order
   const resolved = defs.map(d=>{
     if(d.type==="email"){ const em=allEmails.find(e=>e.id===d.id); return em?{...em,_kind:"email"}:null; }
     return {...d,_kind:"event"};
-  }).filter(Boolean).sort((a,b)=>toMs(b.date,b.time)-toMs(a.date,a.time));
+  }).filter(Boolean).sort((a,b)=>toMs(a.date,a.time)-toMs(b.date,b.time));
 
-  const cards = resolved.map(item=>{
+  const items = resolved.map(item=>{
     if(item._kind==="email"){
       const isOpen = openNewEvents.has(item.id);
       const preview = item.body.replace(/\s+/g," ").trim();
+      const threadLinkHtml = isOpen && item.threadId
+        ? `<div style="margin-top:10px"><span class="thread-link" data-thread="${item.threadId}" style="font-size:12.5px;color:var(--blue);cursor:pointer;text-decoration:underline">View thread →</span></div>` : "";
       return `<div class="re-card" data-toggle-ne="${item.id}">
         <div class="re-card-top">
           <span class="re-card-who">${esc(item.from.name)}</span>
           <span class="re-card-date">${esc(item.date)} · ${esc(item.time||"")}</span>
         </div>
         ${isOpen
-          ? `<div class="re-card-body">${esc(item.body)}${item.threadId?`<div style="margin-top:10px"><span class="thread-link" data-thread="${item.threadId}" style="font-size:12.5px;color:var(--blue);cursor:pointer;text-decoration:underline">View thread →</span></div>`:""}</div>`
+          ? `<div class="re-card-body">${esc(item.body)}${threadLinkHtml}</div>`
           : `<div class="re-card-preview">${esc(preview)}</div>`}
       </div>`;
     } else {
-      // non-email event — same dot+text+timestamp as activity log
       return `<div class="re-event-row">
-        <span class="ev-dot${item.agent?" agent":""}"></span>
+        <span class="${item.agent?"ev-bolt":"ev-dot"}">${item.agent?"⚡":""}</span>
         <span class="re-event-text">${item.html||esc(item.text||"")}</span>
         <span class="re-event-stamp">${esc(item.date)}<br>${esc(item.time||"")}</span>
       </div>`;
@@ -673,8 +692,10 @@ function renderNewEventsZone(){
   }).join("");
 
   return `<div class="new-events-zone">
-    <div class="new-events-label">Related events · ${resolved.length}</div>
-    ${cards}
+    <div class="proposal-divider" style="margin-top:0">
+      <span class="pd-label">What happened</span>
+    </div>
+    <div class="re-timeline">${items}</div>
   </div>`;
 }
 
@@ -687,9 +708,8 @@ function renderActionsPanel(){
 
   let html = renderNewEventsZone();
   const n = p.length;
-  html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-    <div style="width:1px;height:44px;background:var(--line);margin-left:18px;flex:0 0 1px"></div>
-    <div class="proposal-label" style="margin:0">Agent Proposes <span style="color:var(--blue)">${n}</span> Action${n!==1?"s":""}</div>
+  html += `<div class="proposal-divider">
+    <span class="pd-label">Agent Proposes <span class="pd-count">${n}</span> Action${n!==1?"s":""}</span>
   </div>`;
 
   p.forEach((a,i)=>{
@@ -1031,8 +1051,18 @@ function wire(){
 // ============================================================
 //  RENDER + INIT
 // ============================================================
+function syncAgentPanel(){
+  const side = $("agentSide"); if(!side) return;
+  const isDetail = view==="detail";
+  side.style.display = isDetail ? "" : "none";
+  side.classList.toggle("open", isDetail && agentPanelOpen);
+}
+
 function render(){
   renderNav();
+  syncAgentPanel();
+  const agentTab = $("agentTab");
+  if(agentTab) agentTab.onclick = ()=>{ agentPanelOpen=!agentPanelOpen; syncAgentPanel(); };
   const main = $("main-content");
   if(view==="customer"){
     main.innerHTML = renderCustomer();
@@ -1046,6 +1076,8 @@ function render(){
     $("backBtn") && ($("backBtn").onclick=()=>{ view="inbox"; render(); });
   } else if(view==="inbox"){
     main.innerHTML = renderInbox();
+    const fb=$("filterBtn"); if(fb) fb.onclick=(e)=>{ e.stopPropagation(); filterOpen=!filterOpen; render(); };
+    document.onclick=()=>{ if(filterOpen){filterOpen=false;render();} };
     main.querySelectorAll("[data-customer]").forEach(row=>row.onclick=()=>{
       view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null;
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
