@@ -18,8 +18,8 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 function mdToHtml(t){ return t.trim().split(/\n\n+/).map(p=>`<p>${p.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,' ')}</p>`).join(''); }
 function initials(n){ return n.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(); }
-function entityClass(e){ return {customer:"customer",system:"system",agent:"agent",merchant:"merchant"}[e]||"system"; }
-function entityLabel(ec){ return {customer:"Customer",system:"Dunning",agent:"Agent",merchant:"Merchant"}[ec]||"System"; }
+function entityClass(e){ return {customer:"customer",system:"system",dunning:"system",agent:"agent",merchant:"merchant"}[e]||"system"; }
+function entityLabel(ec, override){ return override || {customer:"Customer",system:"System",dunning:"Dunning",agent:"Agent",merchant:"Merchant"}[ec]||"System"; }
 
 // ============================================================
 //  DATA
@@ -52,7 +52,8 @@ Sending the W-9 and updating the contact are both low-risk actions that should u
     { kind:"invoice_aged",    date:"Apr 25, 2026", time:"12:00 AM", text:"INV-2241 crossed 30 days past due — $10,890", agent:false },
     { kind:"update_po",       date:"May 5, 2026",  time:"10:30 AM", text:"Agent set PO 12345 on INV-2241", agent:true },
     { kind:"update_contacts", date:"May 6, 2026",  time:"9:45 AM",  text:"Agent updated primary billing contact to ap@meridiangroup.com", agent:true },
-    { kind:"match_tx",        date:"May 20, 2026", time:"3:10 PM",  text:"Agent matched payment $10,233.60 from Meridian Group to INV-22275", agent:true },
+    { kind:"match_tx",        date:"May 20, 2026", time:"3:10 PM",  agent:true,
+      html:`Agent matched payment $10,233.60 from Meridian Group to <a href="#" onclick="return false" style="color:var(--ink);text-decoration:underline">INV-22275</a> (<a href="#" onclick="return false" style="color:var(--ink);text-decoration:underline">→ transaction</a>)` },
     { kind:"ptp_logged",      date:"May 28, 2026", time:"10:05 AM", text:"Promise to pay logged — $10,890 by Jun 2 via ACH", agent:false },
     { kind:"invoice_pending", date:"May 30, 2026", time:"1:05 PM",  text:"INV-2241 moved to pending and dunning paused: customer says payment sent", agent:true },
     { kind:"invoice_resumed", date:"Jun 1, 2026",  time:"8:00 AM",  text:"INV-2241 moved back to overdue and dunning resumed: payment not confirmed", agent:true },
@@ -60,7 +61,8 @@ Sending the W-9 and updating the contact are both low-risk actions that should u
     { kind:"scheduled_task",  date:"Jun 2, 2026",  time:"9:00 AM",  text:"Agent confirmed INV-2241 hadn't been paid by the PTP date and drafted a follow-up", agent:true },
     { kind:"payment_applied", date:"Jun 2, 2026",  time:"11:30 AM", text:"Payment applied — $5,500 to INV-2241 ($5,390 remaining)", agent:false },
     { kind:"ptp_broken",      date:"Jun 2, 2026",  time:"12:00 AM", text:"Promise to pay broken — $10,890 due Jun 2, not received", agent:false },
-    { kind:"credit_memo",     date:"Jun 3, 2026",  time:"10:00 AM", text:"Credit memo $415 created and applied to INV-8826", agent:true },
+    { kind:"credit_memo",     date:"Jun 3, 2026",  time:"10:00 AM", agent:true,
+      html:`Credit memo $415 created and applied to <a href="#" onclick="return false" style="color:var(--ink);text-decoration:underline">INV-8826</a> (<a href="#" onclick="return false" style="color:var(--ink);text-decoration:underline">→ view memo</a>)` },
     { kind:"escalated",       date:"Jun 3, 2026",  time:"2:30 PM",  text:"Agent marked customer as escalated: customer threatened to churn", agent:true },
     { kind:"invoice_voided",  date:"Jun 4, 2026",  time:"9:15 AM",  text:"INV-2242 voided (duplicate)", agent:true },
   ],
@@ -77,22 +79,44 @@ Sending the W-9 and updating the contact are both low-risk actions that should u
 const THREADS = [
   { id:"t1", subject:"INV-2241 — W-9 + billing contact",
     emails:[
-      { id:"e1", dir:"out", entity:"system", from:{name:"Priya Sharma",email:"billing@generalcatalyst.com"},
+      // Invoice send — system/Postmark, engagement data available
+      { id:"e1", dir:"out", entity:"system", entityLabel:"Invoice Sent",
+        from:{name:"Invoice Sent",email:"billing@generalcatalyst.com"},
         to:[{name:"Dana Reed",email:"finance@meridiangroup.com",badge:"opened"}], cc:[],
-        date:"May 16, 2026", time:"10:31 AM",
-        body:"Hi Dana,\n\nYour invoice INV-2241 for $10,890 is attached. Payment is due Jun 1, 2026. Please use the link below to pay securely online.\n\nThanks,\nPriya Sharma\nGeneral Catalyst",
+        date:"May 1, 2026", time:"10:31 AM",
+        body:"Hi Dana,\n\nYour invoice INV-2241 for $10,890 is attached. Payment is due Jun 1, 2026. Please use the link below to pay securely online.\n\nThanks,\nGeneral Catalyst",
         attachments:[{name:"INV-2241.pdf",type:"PDF"}], badges:["opened"] },
-      { id:"e2", dir:"out", entity:"system", from:{name:"Priya Sharma",email:"billing@generalcatalyst.com"},
+      // Agent email — confirms PO applied + billing contact updated
+      { id:"e_agent", dir:"out", entity:"agent",
+        from:{name:"Collections Agent",email:"billing@generalcatalyst.com"},
+        to:[{name:"Dana Reed",email:"finance@meridiangroup.com",badge:"opened"}], cc:[],
+        date:"May 6, 2026", time:"11:15 AM",
+        body:"Hi Dana,\n\nJust confirming — I've applied PO 12345 to INV-2241 and updated the primary billing contact to ap@meridiangroup.com as requested.\n\nA fresh copy of INV-2241 is attached.\n\nBest,\nGeneral Catalyst Collections",
+        attachments:[{name:"INV-2241.pdf",type:"PDF"}], badges:["opened"] },
+      // Dunning reminder 1 — Postmark dunning, engagement data available
+      { id:"e2", dir:"out", entity:"dunning",
+        from:{name:"Dunning",email:"billing@generalcatalyst.com"},
         to:[{name:"Dana Reed",email:"finance@meridiangroup.com",badge:"opened"}], cc:[],
         date:"May 25, 2026", time:"8:00 AM",
-        body:"Hi Dana,\n\nJust a reminder that invoice INV-2241 for $10,890 is due in one week on Jun 1. Please let us know if you have any questions.\n\nThanks,\nPriya Sharma\nGeneral Catalyst",
+        body:"Hi Dana,\n\nJust a reminder that invoice INV-2241 for $10,890 is due in one week on Jun 1. Please let us know if you have any questions.\n\nGeneral Catalyst",
         attachments:[], badges:["opened"] },
-      { id:"e2b", dir:"out", entity:"system", from:{name:"Priya Sharma",email:"billing@generalcatalyst.com"},
+      // Priya's personal follow-up — merchant email, NOT via Postmark, no engagement data
+      { id:"e_priya", dir:"out", entity:"merchant",
+        from:{name:"Priya Sharma",email:"priya@generalcatalyst.com"},
+        to:[{name:"Dana Reed",email:"finance@meridiangroup.com",badge:null}], cc:[],
+        date:"May 29, 2026", time:"3:20 PM",
+        body:"Hi Dana,\n\nJust wanted to follow up personally — let me know if there's anything blocking payment on INV-2241. Happy to hop on a quick call.\n\nPriya",
+        attachments:[], badges:[] },
+      // Dunning reminder 2 — Postmark dunning, engagement data available
+      { id:"e2b", dir:"out", entity:"dunning",
+        from:{name:"Dunning",email:"billing@generalcatalyst.com"},
         to:[{name:"Dana Reed",email:"finance@meridiangroup.com",badge:"opened"}], cc:[],
         date:"Jun 2, 2026", time:"8:05 AM",
-        body:"Hi Dana,\n\nInvoice INV-2241 for $10,890 was due yesterday and remains unpaid. Please remit at your earliest convenience or reach out if you need assistance.\n\nThanks,\nPriya Sharma\nGeneral Catalyst",
+        body:"Hi Dana,\n\nInvoice INV-2241 for $10,890 was due yesterday and remains unpaid. Please remit at your earliest convenience or reach out if you need assistance.\n\nGeneral Catalyst",
         attachments:[], badges:["opened","clicked"] },
-      { id:"e3", dir:"in", entity:"customer", from:{name:"Dana Reed",email:"finance@meridiangroup.com"},
+      // Dana's inbound — customer email, not tracked via Postmark, no engagement data
+      { id:"e3", dir:"in", entity:"customer",
+        from:{name:"Dana Reed",email:"finance@meridiangroup.com"},
         to:[{name:"Priya Sharma",email:"billing@generalcatalyst.com",badge:null}], cc:[],
         date:"Jun 4, 2026", time:"2:14 PM",
         body:"Hi,\n\nBefore we can process payment we need a signed W-9 from your company. Also, please update our billing contact to ap@meridiangroup.com going forward.\n\nThanks,\nDana",
@@ -314,7 +338,7 @@ function deepLinkToThread(threadId){
 // ============================================================
 function renderEmailCard(em, opts={}){
   const ec = entityClass(em.entity);
-  const label = entityLabel(ec);
+  const label = entityLabel(ec, em.entityLabel);
   const isHeaderOpen = expandedHeaders.has(em.id);
   const toNames = em.to.map(r=>r.name||r.email).join(", ");
   const ccNames = (em.cc||[]).map(r=>r.name||r.email).join(", ");
@@ -533,24 +557,40 @@ function renderActivityList(){
       const latestInThread = thread ? [...thread.emails].sort((a,b)=>toMs(b.date,b.time)-toMs(a.date,a.time))[0] : null;
       const isLatest = latestInThread && latestInThread.id===item.id;
       const draftBadge = (thread&&thread.agentReplyDraft&&isLatest) ? `<span class="draft-badge">✎ Agent draft</span>` : "";
-      const [ico, dark] = eventIcon("email", true, false);
       return `<div class="act-row email-row" data-open-email="${item.id}">
-        <span class="ar-icon ${dark?"agent":""}">${ico}</span>
-        <span class="ar-date">${esc(item.date)}</span>
-        <span class="ar-who">${esc(sender)}${draftBadge}</span>
-        <span class="ar-body">${esc(preview)}</span>
-        <span class="ar-badges">${badges}</span>
+        <div class="email-row-top">
+          <span class="email-row-who">${esc(sender)}${draftBadge}</span>
+          <span class="email-row-date">${esc(item.date)} · ${esc(item.time||"")}</span>
+        </div>
+        <div class="email-row-body">${esc(preview)}</div>
+        ${badges?`<div class="email-row-foot">${badges}</div>`:""}
       </div>`;
     } else {
-      const [ico, dark] = eventIcon(item.kind, false, !!item.agent);
-      return `<div class="act-row">
-        <span class="ar-icon ${dark?"agent":""}">${ico}</span>
-        <span class="ar-date">${esc(item.date)}</span>
-        <span class="ar-body" style="flex:1">${esc(item.text)}</span>
+      const marker = item.agent
+        ? `<span class="ev-bolt">⚡</span>`
+        : `<span class="ev-dot"></span>`;
+      return `<div class="act-row" style="position:relative">
+        ${marker}
+        <span class="ar-body" style="flex:1;font-size:13px;color:var(--ink)">${item.html||esc(item.text||"")}</span>
+        <span class="ar-datestamp">${esc(item.date)}<br>${esc(item.time||"")}</span>
       </div>`;
     }
-  }).join("");
-  return `<div class="act-list">${rows}</div>`;
+  });
+  // group consecutive event rows under a timeline wrapper; email rows stay flat
+  let out = "";
+  let i2 = 0;
+  while(i2 < items.length){
+    if(items[i2].type === "email"){
+      out += rows[i2]; i2++;
+    } else {
+      let seg = "";
+      while(i2 < items.length && items[i2].type !== "email"){
+        seg += rows[i2]; i2++;
+      }
+      out += `<div class="act-timeline">${seg}</div>`;
+    }
+  }
+  return `<div class="act-list">${out}</div>`;
 }
 
 function renderThreadFull(thread){
