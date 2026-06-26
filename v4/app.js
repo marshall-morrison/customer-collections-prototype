@@ -66,12 +66,21 @@ Sending the W-9 and updating the contact are both low-risk actions that should u
     { kind:"escalated",       date:"Jun 3, 2026",  time:"2:30 PM",  text:"Agent marked customer as escalated: customer threatened to churn", agent:true },
     { kind:"invoice_voided",  date:"Jun 4, 2026",  time:"9:15 AM",  text:"INV-2242 voided (duplicate)", agent:true },
   ],
+  // events that triggered these agent actions — email IDs or inline event objects
+  newEvents: [
+    { type:"email", id:"e3a" },
+    { type:"email", id:"e3b" },
+    { type:"event", kind:"payment_failed", date:"Jun 1, 2026", time:"11:42 PM",
+      text:"Payment failed — $10,890 on INV-2241 (R01 insufficient funds)", agent:false },
+  ],
+
   proposed: [
     { kind:"update_contacts", desc:"Update primary billing contact → ap@meridiangroup.com", editableContact:"ap@meridiangroup.com" },
     { kind:"send_email", desc:"Reply to Dana Reed with signed W-9 attached, confirm billing contact update", invoice:"INV-2241",
-      attachments:[{name:"W-9_GeneralCatalyst.pdf"},{name:"INV-2241.pdf"}],
+      attachments:[{name:"W-9_GeneralCatalyst.pdf"}],
       draft:{ to:"finance@meridiangroup.com", cc:"ap@meridiangroup.com", subject:"Re: INV-2241 — W-9 + billing contact",
-        body:"Hi Dana,\n\nThanks for flagging both — the signed W-9 is attached. I've also updated the billing contact to ap@meridiangroup.com as requested.\n\nA fresh copy of INV-2241 is attached as well. Let me know if anything else is needed.\n\nBest,\nPriya Sharma\nGeneral Catalyst" },
+        body:"Hi Dana,\n\nThanks for flagging both — the signed W-9 is attached. I've also updated the billing contact to ap@meridiangroup.com as requested.\n\nLet me know if anything else is needed.\n\nBest,\nPriya Sharma\nGeneral Catalyst",
+        attachments:[{name:"W-9_GeneralCatalyst.pdf"}] },
     },
   ],
 };
@@ -114,12 +123,19 @@ const THREADS = [
         date:"Jun 2, 2026", time:"8:05 AM",
         body:"Hi Dana,\n\nInvoice INV-2241 for $10,890 was due yesterday and remains unpaid. Please remit at your earliest convenience or reach out if you need assistance.\n\nGeneral Catalyst",
         attachments:[], badges:["opened","clicked"] },
-      // Dana's inbound — customer email, not tracked via Postmark, no engagement data
-      { id:"e3", dir:"in", entity:"customer",
+      // Dana email 1 — billing contact request
+      { id:"e3a", dir:"in", entity:"customer",
         from:{name:"Dana Reed",email:"finance@meridiangroup.com"},
         to:[{name:"Priya Sharma",email:"billing@generalcatalyst.com",badge:null}], cc:[],
         date:"Jun 4, 2026", time:"2:14 PM",
-        body:"Hi,\n\nBefore we can process payment we need a signed W-9 from your company. Also, please update our billing contact to ap@meridiangroup.com going forward.\n\nThanks,\nDana",
+        body:"Hi,\n\nPlease update our billing contact on file to ap@meridiangroup.com going forward. All invoices and correspondence should go there.\n\nThanks,\nDana",
+        attachments:[], badges:[] },
+      // Dana email 2 — W-9 request (follow-up on same thread a few minutes later)
+      { id:"e3b", dir:"in", entity:"customer",
+        from:{name:"Dana Reed",email:"finance@meridiangroup.com"},
+        to:[{name:"Priya Sharma",email:"billing@generalcatalyst.com",badge:null}], cc:[],
+        date:"Jun 4, 2026", time:"2:18 PM",
+        body:"Also — before we can process payment we'll need a signed W-9 from your company. Can you send that over as well?\n\nDana",
         attachments:[], badges:[] },
     ],
     agentReplyDraft:"Hi Dana,\n\nThanks for flagging both — the signed W-9 is attached. I've also updated the billing contact to ap@meridiangroup.com as requested.\n\nA fresh copy of INV-2241 is attached as well. Let me know if anything else is needed.\n\nBest,\nPriya Sharma\nGeneral Catalyst",
@@ -143,6 +159,8 @@ let threadOpenEmails = new Set();
 let expandedHeaders = new Set();
 let showBcc = false;
 let attachPickerOpen = false;
+let recipientPills = {}; // {actionIdx: {to:[...], cc:[...]}}
+let openNewEvents = new Set(); // which new-event email IDs are expanded
 
 const AVAILABLE_ATTACHMENTS = [
   { name:"W-9_GeneralCatalyst.pdf", type:"PDF" },
@@ -379,17 +397,20 @@ function renderEmailCard(em, opts={}){
     ? `<div class="em-card-footer"><span class="thread-link" data-thread="${opts.threadId}" style="font-size:12.5px;color:var(--helper);cursor:pointer;text-decoration:underline">See entire thread →</span></div>` : "";
 
   return `<div class="em-card">
-    <div class="em-card-head" data-toggle-header="${em.id}">
+    <div class="em-card-head" style="cursor:default">
       <div class="em-head-left">
         <div class="em-name-row">
           <span class="ent-strip ${ec}" style="margin:0">${label}</span>
           <span class="em-name">${esc(em.from.name)}</span>
         </div>
-        ${headerSummary}
+        <span class="em-to-summary">
+          to <span class="to-names">${esc(toNames)}</span>
+          ${ccNames?` cc <span class="to-names">${esc(ccNames)}</span>`:""}
+          <span class="em-chevron" data-header-modal="${em.id}">▾</span>
+        </span>
       </div>
       <span class="em-date">${esc(em.date)} · ${esc(em.time)}</span>
     </div>
-    ${headerDetail}
     <div class="em-card-body">${esc(em.body)}</div>
     ${attach}${footer}
   </div>`;
@@ -398,30 +419,121 @@ function renderEmailCard(em, opts={}){
 // ============================================================
 //  DRAFT EDITOR
 // ============================================================
+function openEmailHeaderModal(emailId){
+  const allEmails = THREADS.flatMap(t=>t.emails);
+  const em = allEmails.find(e=>e.id===emailId); if(!em) return;
+  const chk = v=>`<span style="color:${v?"var(--ink)":"var(--line)"};font-weight:${v?"700":"400"}">${v?"✓":"—"}</span>`;
+  const o = !!(em.badges||[]).includes("opened");
+  const c = !!(em.badges||[]).includes("clicked");
+  const b = !!(em.badges||[]).includes("bounced");
+  const f = !!(em.badges||[]).includes("failed");
+  const recipRows = [...em.to,...(em.cc||[])].map(r=>{
+    const pf = em.to.includes(r)?"To":"CC";
+    return `<tr>
+      <td style="padding:5px 10px 5px 0;color:var(--helper);font-size:12px">${pf}</td>
+      <td style="padding:5px 10px 5px 0;font-size:13px">${esc(r.name||"")} &lt;${esc(r.email)}&gt;</td>
+      <td style="text-align:center;padding:5px 8px">${chk(true)}</td>
+      <td style="text-align:center;padding:5px 8px">${chk(o)}</td>
+      <td style="text-align:center;padding:5px 8px">${chk(c)}</td>
+      <td style="text-align:center;padding:5px 8px">${chk(b)}</td>
+      <td style="text-align:center;padding:5px 8px">${chk(f)}</td>
+    </tr>`;
+  }).join("");
+  $("modal").innerHTML=`<div class="scrim" id="hdrBg">
+    <div class="modal" style="max-width:520px">
+      <div style="display:grid;grid-template-columns:55px 1fr;gap:5px 10px;font-size:13px;margin-bottom:16px">
+        <span style="color:var(--helper);font-weight:600;text-align:right">from</span>
+        <span><strong>${esc(em.from.name)}</strong> &lt;${esc(em.from.email)}&gt;</span>
+        <span style="color:var(--helper);font-weight:600;text-align:right">date</span>
+        <span>${esc(em.date)} · ${esc(em.time)}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr>
+          <th style="text-align:left;padding:4px 10px 6px 0;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px"></th>
+          <th style="text-align:left;padding:4px 10px 6px 0;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Recipient</th>
+          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Delivered</th>
+          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Opened</th>
+          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Clicked</th>
+          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Bounced</th>
+          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Failed</th>
+        </tr></thead>
+        <tbody>${recipRows}</tbody>
+      </table>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
+        <button class="btn" id="hdrClose">Close</button>
+      </div>
+    </div>
+  </div>`;
+  $("hdrClose").onclick=()=>{ $("modal").innerHTML=""; };
+  $("hdrBg").onclick=(e)=>{ if(e.target.id==="hdrBg") $("modal").innerHTML=""; };
+}
+
 function renderDraftEditor(draft, actionIdx){
+  // init recipient pills from draft
+  if(!recipientPills[actionIdx]){
+    const toList = (draft.to||"").split(",").map(s=>s.trim()).filter(Boolean);
+    const ccList = (draft.cc||"").split(",").map(s=>s.trim()).filter(Boolean);
+    recipientPills[actionIdx] = {to: toList, cc: ccList};
+  }
+  const pills = recipientPills[actionIdx];
+
+  // init attachments
   const selAttach = selectedAttachments[actionIdx] || new Set((draft.attachments||[]).map(a=>a.name));
   if(!selectedAttachments[actionIdx]) selectedAttachments[actionIdx] = selAttach;
-  const attachChips = [...selAttach].map(name=>
-    `<span class="draft-attach-chip" onclick="window.open('#','_blank')">📎 ${esc(name)}<span class="rm" data-rm-attach="${actionIdx}:${esc(name)}">×</span></span>`
+
+  const isThread = draft.subject && draft.subject.startsWith("Re:");
+  const isReply = actionIdx === "reply";
+
+  // don't show "View thread" when already inside the thread (activity log)
+  const threadLink = isThread && actionIdx !== "reply"
+    ? `<span class="draft-thread-link thread-link" data-thread="t1">View thread</span>` : "";
+
+  // recipient pill rows
+  const pillsHtml = (list, field) => list.map(e=>
+    `<span class="email-pill">${esc(e)}<span class="ep-rm" data-rm-pill="${actionIdx}:${field}:${esc(e)}">×</span></span>`
+  ).join("") + `<input class="recip-input" placeholder="" data-pill-input="${actionIdx}:${field}">`;
+
+  const subjectClass = isThread ? "subject-input greyed" : "subject-input";
+  const subjectTitle = isThread ? 'title="Subject locked for thread replies"' : "";
+
+  const attachPillsHtml = [...selAttach].map(name=>
+    `<span class="attach-pill-tag" onclick="window.open('#','_blank')">📎 ${esc(name.split('/').pop())} <span class="ap-rm" data-rm-attach="${actionIdx}:${esc(name)}">×</span></span>`
   ).join("");
-  const addBtn = `<span class="draft-attach-add" data-open-picker="${actionIdx}">+ Add attachment</span>`;
-  const pickerHtml = attachPickerOpen===actionIdx
-    ? `<div class="attach-picker">${AVAILABLE_ATTACHMENTS.filter(a=>!selAttach.has(a.name)).map(a=>
+
+  const pickerItems = AVAILABLE_ATTACHMENTS.filter(a=>!selAttach.has(a.name));
+  const pickerHtml = String(attachPickerOpen)===String(actionIdx) && pickerItems.length
+    ? `<div class="attach-picker">${pickerItems.map(a=>
         `<div class="attach-picker-item" data-pick-attach="${actionIdx}:${esc(a.name)}">${esc(a.name)}</div>`
       ).join("")}</div>` : "";
-  const rejectApprove = (actionIdx==="reply") ? `<button class="btn" style="padding:6px 16px">Send</button>` :
-    `<button class="btn" data-rej="${actionIdx}"><span class="ic">${ICON.x}</span>Reject</button>
-     <button class="btn" data-app="${actionIdx}"><span class="ic">${ICON.check}</span>Approve &amp; send</button>`;
+
+  const footer = isReply
+    ? `<button class="btn" style="padding:6px 16px">Send</button>`
+    : `<button class="btn" data-rej="${actionIdx}"><span class="ic">${ICON.x}</span>Reject</button>
+       <button class="btn" data-app="${actionIdx}"><span class="ic">${ICON.check}</span>Approve &amp; send</button>`;
+
   return `<div class="draft-editor">
-    <div class="draft-fields">
-      <div class="draft-field"><span class="df-label">To</span><input class="df-val" value="${esc(draft.to||"")}" style="border-bottom:1px solid var(--line2)"><span class="draft-bcc-toggle" data-toggle-bcc>BCC</span></div>
-      <div class="draft-field"><span class="df-label">CC</span><input class="df-val" value="${esc(draft.cc||"")}" style="border-bottom:1px solid var(--line2)"></div>
-      ${showBcc?`<div class="draft-field"><span class="df-label">BCC</span><input class="df-val" style="border-bottom:1px solid var(--line2)"></div>`:""}
-      <div class="draft-field"><span class="df-label">Subj</span><input class="df-val" value="${esc(draft.subject||"")}"></div>
+    ${threadLink}
+    <div class="recip-field">
+      <span class="recip-label">To</span>${pillsHtml(pills.to,"to")}
+    </div>
+    <div class="recip-field">
+      <span class="recip-label">CC</span>${pillsHtml(pills.cc,"cc")}
+    </div>
+    <div class="subject-field">
+      <span class="subject-label">Subj</span>
+      <input class="${subjectClass}" value="${esc(draft.subject||"")}" ${subjectTitle}>
     </div>
     <textarea class="draft-body-area">${esc(draft.body||"")}</textarea>
-    <div class="draft-attach-bar">${attachChips}${addBtn}${pickerHtml}</div>
-    <div class="draft-footer">${rejectApprove}</div>
+    <div class="draft-tiny">
+      <span data-cancel-draft="${actionIdx}">Cancel</span>
+      <span data-save-draft="${actionIdx}">Save</span>
+    </div>
+    <div class="attach-row" style="position:relative">
+      ${attachPillsHtml}
+      <span class="attach-add-btn" data-open-picker="${actionIdx}">+ Attachments</span>
+      ${pickerHtml}
+    </div>
+    <div class="draft-footer">${footer}</div>
   </div>`;
 }
 
@@ -431,7 +543,7 @@ function renderDraftEditor(draft, actionIdx){
 function renderDetailHeader(){
   const pendingCount = SCENARIO.proposed.filter((_,i)=>!actionState[i]).length;
   const inv = SCENARIO.invoices[0];
-  const chip = `<span class="due-chip over">${inv.od}d overdue</span>`;
+  const chip = `<span style="font-size:12px;color:var(--warn);margin-left:5px">(${inv.od}d overdue)</span>`;
   const amt = fmtMoney(inv.amount);
   return `
     <div class="crumb">
@@ -466,10 +578,44 @@ function renderDetailHeader(){
 // ============================================================
 //  DETAIL — actions panel
 // ============================================================
-function renderTriggeringEvent(){
-  const triggers = activityItems().filter(e=>e.type==="email"&&e.dir==="in").slice(0,2);
-  if(!triggers.length) return "";
-  return triggers.map(t=>renderEmailCard(t,{showThreadLink:true,threadId:t.threadId})).join("");
+function renderNewEventsZone(){
+  const defs = SCENARIO.newEvents || [];
+  if(!defs.length) return "";
+  const allEmails = THREADS.flatMap(t=>t.emails.map(e=>({...e,threadId:t.id})));
+
+  // resolve and sort chronologically
+  const resolved = defs.map(d=>{
+    if(d.type==="email"){ const em=allEmails.find(e=>e.id===d.id); return em?{...em,_kind:"email"}:null; }
+    return {...d,_kind:"event"};
+  }).filter(Boolean).sort((a,b)=>toMs(b.date,b.time)-toMs(a.date,a.time));
+
+  const cards = resolved.map(item=>{
+    if(item._kind==="email"){
+      const isOpen = openNewEvents.has(item.id);
+      const preview = item.body.replace(/\s+/g," ").trim();
+      return `<div class="re-card" data-toggle-ne="${item.id}">
+        <div class="re-card-top">
+          <span class="re-card-who">${esc(item.from.name)}</span>
+          <span class="re-card-date">${esc(item.date)} · ${esc(item.time||"")}</span>
+        </div>
+        ${isOpen
+          ? `<div class="re-card-body">${esc(item.body)}${item.threadId?`<div style="margin-top:10px"><span class="thread-link" data-thread="${item.threadId}" style="font-size:12.5px;color:var(--blue);cursor:pointer;text-decoration:underline">View thread →</span></div>`:""}</div>`
+          : `<div class="re-card-preview">${esc(preview)}</div>`}
+      </div>`;
+    } else {
+      // non-email event — same dot+text+timestamp as activity log
+      return `<div class="re-event-row">
+        <span class="ev-dot${item.agent?" agent":""}"></span>
+        <span class="re-event-text">${item.html||esc(item.text||"")}</span>
+        <span class="re-event-stamp">${esc(item.date)}<br>${esc(item.time||"")}</span>
+      </div>`;
+    }
+  }).join("");
+
+  return `<div class="new-events-zone">
+    <div class="new-events-label">Related events · ${resolved.length}</div>
+    ${cards}
+  </div>`;
 }
 
 function renderActionsPanel(){
@@ -479,13 +625,19 @@ function renderActionsPanel(){
     ? `<span class="as-count"><span>${pending}</span> action${pending>1?"s":""} awaiting review ↓</span>`
     : `<span class="as-count" style="color:var(--good)">✓ All actions resolved</span>`;
 
-  let html = "";
+  let html = renderNewEventsZone();
+  const n = p.length;
+  html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <div style="width:1px;height:44px;background:var(--line);margin-left:18px;flex:0 0 1px"></div>
+    <div class="proposal-label" style="margin:0">Agent Proposes <span style="color:var(--blue)">${n}</span> Action${n!==1?"s":""}</div>
+  </div>`;
 
   p.forEach((a,i)=>{
     const st = actionState[i];
     const isEmail = a.kind==="send_email";
     const isContact = a.kind==="update_contacts" && a.editableContact!=null;
-    const isEditing = editingCard===i && isContact && !st;
+    const isExpContact = expandedCard===i && isContact && !st;
+    const isEditing = false; // contacts now use expandedCard pattern like email
     const attachHtml = (a.attachments||[]).map(att=>`<span class="attach-chip">📎 ${esc(att.name)}</span>`).join("");
     let acts="";
     if(st==="approved") acts=`<span class="verdict ok">✓ Approved</span>`;
@@ -499,24 +651,70 @@ function renderActionsPanel(){
         acts="";
       } else {
         const val = editValues[i]!==undefined?editValues[i]:a.editableContact;
-        contactEdit=`<div style="margin-top:6px;font-size:13px;color:#34352f">Primary contact → ${esc(val)} <span style="color:var(--blue);font-size:12px;cursor:pointer;margin-left:6px" data-edit="${i}">Edit</span></div>`;
+        contactEdit=`<span style="font-size:13px;color:#34352f;margin-left:8px">→ ${esc(val)}</span><span style="color:var(--blue);font-size:12px;cursor:pointer;margin-left:8px" data-edit="${i}">Edit</span>`;
       }
     }
-    const threadLink = isEmail&&a.draft
-      ? `<div style="margin-top:4px"><span class="thread-link" data-thread="t1" style="font-size:12.5px;color:var(--helper);cursor:pointer;text-decoration:underline">See entire thread →</span></div>` : "";
-    const inlineDraft = isEmail&&!st&&a.draft ? renderDraftEditor(a.draft,i) : "";
-    html+=`<div class="card ${st?"done":""}" style="flex-direction:column;align-items:stretch">
-      <div style="display:flex;align-items:center;gap:16px">
-        <div class="body" style="flex:1">
-          <span class="title">${esc({send_email:"Send email",update_contacts:"Update billing contacts"}[a.kind]||a.kind)}</span>${isContact?"":` <span class="desc">${esc(a.desc)}</span>`}
-          ${attachHtml}
-          <div class="meta">${a.invoice?`Invoice ${esc(a.invoice)}`:"Account-level"}</div>
-          ${contactEdit}${threadLink}
+    const attachCount = (a.attachments||[]).length;
+    const isExpanded = expandedCard===i && isEmail && !st;
+    const inlineDraft = isExpanded&&a.draft ? renderDraftEditor(a.draft,i) : "";
+
+    if(isEmail){
+      html+=`<div class="card ${st?"done":""}" style="flex-direction:column;align-items:stretch">
+        <div class="se-collapsed">
+          <div class="body" style="flex:1;min-width:0">
+            <span class="title">Send email</span>
+            <span class="desc">${esc(a.desc)}</span>
+            ${attachCount?`<span class="se-meta">${attachCount} attachment${attachCount>1?"s":""}</span>`:""}
+          </div>
+          ${st
+            ? `<span class="verdict ${st==="approved"?"ok":"no"}">${st==="approved"?"✓ Approved":"Rejected"}</span>`
+            : `<button class="btn se-edit" data-expand="${i}">${isExpanded?"Close":"Edit"}</button>
+               <button class="btn" data-rej="${i}"><span class="ic">${ICON.x}</span>Reject</button>
+               <button class="btn" data-app="${i}"><span class="ic">${ICON.check}</span>Approve</button>`}
         </div>
-        ${!isEmail?`<div class="acts">${acts}</div>`:""}
-      </div>
-      ${inlineDraft}
-    </div>`;
+        ${inlineDraft}
+      </div>`;
+    } else if(isContact){
+      const curVal = editValues[i]!==undefined ? editValues[i] : a.editableContact;
+      const contactExpanded = isExpContact ? `
+        <div class="draft-editor" style="margin-top:12px">
+          <div class="recip-field">
+            <span class="recip-label" style="flex:0 0 80px;font-size:12px;font-weight:600;color:var(--helper)">Primary contact</span>
+            <input id="ci${i}" value="${esc(curVal)}" style="flex:1;border:none;outline:none;font-size:13px;font-family:inherit;border-bottom:1px solid var(--line2);padding:4px 0;">
+          </div>
+          <div class="draft-tiny">
+            <span data-canceledit="${i}">Cancel</span>
+            <span data-save="${i}">Save</span>
+          </div>
+          <div class="draft-footer">
+            <button class="btn" data-rej="${i}"><span class="ic">${ICON.x}</span>Reject</button>
+            <button class="btn" data-app="${i}"><span class="ic">${ICON.check}</span>Approve</button>
+          </div>
+        </div>` : "";
+      html+=`<div class="card ${st?"done":""}" style="flex-direction:column;align-items:stretch">
+        <div class="se-collapsed">
+          <div class="body" style="flex:1;min-width:0">
+            <span class="title">Update billing contacts</span>
+            <span class="se-meta">→ ${esc(curVal)}</span>
+          </div>
+          ${st
+            ? `<span class="verdict ${st==="approved"?"ok":"no"}">${st==="approved"?"✓ Approved":"Rejected"}</span>`
+            : `<button class="btn se-edit" data-expand="${i}">${isExpContact?"Close":"Edit"}</button>
+               <button class="btn" data-rej="${i}"><span class="ic">${ICON.x}</span>Reject</button>
+               <button class="btn" data-app="${i}"><span class="ic">${ICON.check}</span>Approve</button>`}
+        </div>
+        ${contactExpanded}
+      </div>`;
+    } else {
+      html+=`<div class="card ${st?"done":""}" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;align-items:center;gap:16px">
+          <div class="body" style="flex:1">
+            <span class="title">${esc(a.kind)}</span><span class="desc">${esc(a.desc)}</span>
+          </div>
+          <div class="acts">${acts}</div>
+        </div>
+      </div>`;
+    }
   });
   return html||`<div class="empty">No actions pending.</div>`;
 }
@@ -603,7 +801,6 @@ function renderThreadFull(thread){
     if(!isOpen){
       const preview = em.body.replace(/\s+/g," ").trim();
       html+=`<div class="em-collapsed" data-expand-email="${em.id}" style="margin-bottom:8px">
-        <span class="em-num">${idx+1}</span>
         <span class="ec-who">${esc(em.from.name)}</span>
         <span class="ec-pre">${esc(preview)}</span>
         <span class="ec-date">${esc(em.date)}</span>
@@ -613,10 +810,24 @@ function renderThreadFull(thread){
     }
   });
   if(thread.agentReplyDraft){
-    html+=`<div style="margin-top:4px">${renderDraftEditor({
-      to:thread.emails[thread.emails.length-1]?.from?.email||"",
-      cc:"", subject:`Re: ${thread.subject}`, body:thread.agentReplyDraft, attachments:[]
-    },"reply")}</div>`;
+    html+=`<div style="display:flex;justify-content:center;padding:6px 0">
+      <div style="width:1px;height:28px;background:#b0b0ab"></div>
+    </div>
+    <div class="em-card thread-draft" style="margin-bottom:0">
+      <div class="em-card-head" style="cursor:default;padding-bottom:6px">
+        <div class="em-head-left">
+          <div class="em-name-row">
+            <span class="ent-strip agent" style="margin:0">Agent</span>
+            <span class="em-name" style="margin-left:6px">Collections Agent</span>
+            <span style="font-size:12px;color:var(--helper);margin-left:8px;font-style:italic">Draft</span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:0 14px 14px">${renderDraftEditor({
+        to:thread.emails[thread.emails.length-1]?.from?.email||"",
+        cc:"", subject:`Re: ${thread.subject}`, body:thread.agentReplyDraft, attachments:[]
+      },"reply")}</div>
+    </div>`;
   } else {
     html+=`<div class="reply-box" style="margin-top:8px">
       <textarea placeholder="Reply…"></textarea>
@@ -646,16 +857,35 @@ function renderPanel(){
 
 function wire(){
   const p = $("panel"); if(!p) return;
+  p.querySelectorAll("[data-toggle-ne]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const id=el.dataset.toggleNe; if(openNewEvents.has(id)) openNewEvents.delete(id); else openNewEvents.add(id); renderPanel(); });
   p.querySelectorAll("[data-app]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); actionState[+el.dataset.app]="approved"; expandedCard=null; renderPanel(); });
   p.querySelectorAll("[data-rej]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); actionState[+el.dataset.rej]="rejected"; expandedCard=null; renderPanel(); });
+  p.querySelectorAll("[data-expand]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const i=+el.dataset.expand; expandedCard=(expandedCard===i)?null:i; renderPanel(); });
   p.querySelectorAll("[data-edit]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); editingCard=+el.dataset.edit; renderPanel(); });
   p.querySelectorAll("[data-save]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const i=+el.dataset.save; const inp=document.getElementById("ci"+i); if(inp) editValues[i]=inp.value; editingCard=null; renderPanel(); });
   p.querySelectorAll("[data-canceledit]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); editingCard=null; renderPanel(); });
   p.querySelectorAll("[data-open-email]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); openThread(el.dataset.openEmail); renderPanel(); });
   p.querySelectorAll("[data-back-activity]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); selectedEmailId=null; threadOpenEmails=new Set(); renderPanel(); });
   p.querySelectorAll("[data-expand-email]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const id=el.dataset.expandEmail; if(threadOpenEmails.has(id)) threadOpenEmails.delete(id); else threadOpenEmails.add(id); renderPanel(); });
-  p.querySelectorAll("[data-toggle-header]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const id=el.dataset.toggleHeader; if(expandedHeaders.has(id)) expandedHeaders.delete(id); else expandedHeaders.add(id); renderPanel(); });
-  p.querySelectorAll("[data-toggle-bcc]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); showBcc=!showBcc; renderPanel(); });
+  p.querySelectorAll("[data-header-modal]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); openEmailHeaderModal(el.dataset.headerModal); });
+  // pill add on space/comma
+  p.querySelectorAll("[data-pill-input]").forEach(el=>el.onkeydown=(e)=>{
+    if(e.key===" "||e.key===","||e.key==="Enter"){ e.preventDefault();
+      const val=el.value.trim().replace(/,$/,"");
+      if(!val) return;
+      const [idx,field]=el.dataset.pillInput.split(":");
+      if(!recipientPills[idx]) recipientPills[idx]={to:[],cc:[]};
+      recipientPills[idx][field].push(val); el.value=""; renderPanel();
+    }
+  });
+  // pill remove
+  p.querySelectorAll("[data-rm-pill]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation();
+    const [idx,field,email]=el.dataset.rmPill.split(":");
+    if(recipientPills[idx]) recipientPills[idx][field]=recipientPills[idx][field].filter(x=>x!==email);
+    renderPanel();
+  });
+  p.querySelectorAll("[data-cancel-draft]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); expandedCard=null; renderPanel(); });
+  p.querySelectorAll("[data-save-draft]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); expandedCard=null; renderPanel(); });
   p.querySelectorAll("[data-open-picker]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); attachPickerOpen=attachPickerOpen===el.dataset.openPicker?false:el.dataset.openPicker; renderPanel(); });
   p.querySelectorAll("[data-pick-attach]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const [idx,name]=el.dataset.pickAttach.split(":"); if(!selectedAttachments[idx]) selectedAttachments[idx]=new Set(); selectedAttachments[idx].add(name); attachPickerOpen=false; renderPanel(); });
   p.querySelectorAll("[data-rm-attach]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const [idx,name]=el.dataset.rmAttach.split(":"); if(selectedAttachments[idx]) selectedAttachments[idx].delete(name); renderPanel(); });
@@ -680,6 +910,7 @@ function render(){
       view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null;
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
+      openNewEvents=new Set(); recipientPills={};
       activeTab="actions"; render();
     });
     $("backBtn") && ($("backBtn").onclick=()=>{ view="inbox"; render(); });
@@ -689,6 +920,7 @@ function render(){
       view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null;
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
+      openNewEvents=new Set(); recipientPills={};
       activeTab="actions"; render();
     });
   } else {

@@ -235,8 +235,13 @@
   .em-card-attach{padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap;}
   .em-card-footer{padding:8px 16px 12px;border-top:1px solid var(--line2);}
   /* collapsed email in thread (numbered) */
-  .em-collapsed{display:flex;align-items:center;gap:12px;padding:9px 16px;cursor:pointer;border-bottom:1px solid var(--line2);background:#fafafa;}
-  .em-collapsed:hover{background:var(--soft);}
+  .em-collapsed{display:flex;align-items:center;gap:12px;padding:9px 16px;cursor:pointer;border-bottom:1px solid var(--line2);background:#f5f5f3;}
+  .em-collapsed:hover{background:#efefec;}
+  .em-collapsed .ec-who{color:var(--helper);}
+  .em-collapsed .ec-pre,.em-collapsed .ec-date{color:#b4b5ae;}
+  /* grey for expanded emails in thread view — not the agent draft */
+  .thread-view .em-card:not(.thread-draft){background:#f5f5f3;}
+  .thread-view .em-card:not(.thread-draft) .em-card-head:hover{background:#efefec;}
   .em-num{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:11px;background:#e4e4e0;font-size:11px;font-weight:700;color:var(--helper);padding:0 6px;}
   .em-collapsed .ec-who{font-size:13px;font-weight:600;}
   .em-collapsed .ec-pre{flex:1;min-width:0;font-size:12.5px;color:var(--helper);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-left:4px;}
@@ -246,25 +251,62 @@
   .thread-back-btn:hover{background:var(--soft);}
   /* agent draft indicator on activity list */
   .draft-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 6px;border:1px solid var(--line);border-radius:4px;color:var(--ink);margin-left:6px;vertical-align:middle;}
-  /* ===== DRAFT EDITOR ===== */
-  .draft-editor{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px;}
-  .draft-fields{padding:10px 14px;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:6px;}
-  .draft-field{display:flex;align-items:baseline;gap:8px;font-size:12.5px;}
-  .draft-field .df-label{flex:0 0 36px;color:var(--helper);font-weight:600;font-size:12px;}
-  .draft-field .df-val{flex:1;border:none;outline:none;font-size:13px;font-family:inherit;color:var(--ink);background:transparent;padding:2px 0;}
-  .draft-field .df-val:focus{border-bottom:1px solid var(--blue);}
-  .draft-bcc-toggle{font-size:11.5px;color:var(--blue);cursor:pointer;margin-left:auto;}
-  .draft-body-area{width:100%;border:none;padding:12px 14px;font-size:13px;font-family:inherit;line-height:1.55;resize:vertical;min-height:110px;outline:none;background:#fff;}
-  .draft-attach-bar{padding:8px 14px;border-top:1px solid var(--line2);display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
-  .draft-attach-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 9px;border:1px solid var(--line);border-radius:5px;color:var(--ink);cursor:pointer;}
-  .draft-attach-chip:hover{background:var(--soft);}
-  .draft-attach-chip .rm{color:var(--helper);font-size:10px;margin-left:2px;}
-  .draft-attach-add{font-size:12px;color:var(--blue);cursor:pointer;padding:3px 8px;border:1px dashed var(--line);border-radius:5px;}
-  .draft-attach-add:hover{border-color:var(--blue);}
-  .attach-picker{border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.1);padding:6px 0;min-width:220px;font-size:13px;}
-  .attach-picker-item{padding:7px 14px;cursor:pointer;color:var(--ink);}
+  /* ===== AGENT ACTIONS PANEL ===== */
+  .new-events-zone{background:#f6f6f4;border-radius:10px;padding:12px 14px;margin-bottom:0;}
+  .new-events-label{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:#9a9a95;margin-bottom:10px;}
+  /* related event cards — same style as activity log email cards but inline expand */
+  .re-card{background:#edecea;border:1px solid #e0dfdc;border-radius:8px;margin-bottom:8px;cursor:pointer;overflow:hidden;}
+  .re-card:last-child{margin-bottom:0;}
+  .re-card:hover{background:#e8e6e3;}
+  .re-card-top{display:flex;align-items:center;gap:10px;padding:10px 14px;}
+  .re-card-who{font-size:13px;font-weight:700;flex:1;}
+  .re-card-date{font-size:11.5px;color:var(--helper);}
+  .re-card-preview{font-size:12.5px;color:var(--helper);padding:0 14px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .re-card-body{padding:0 14px 12px;font-size:13px;color:#2f302b;line-height:1.55;white-space:pre-wrap;border-top:1px solid var(--line2);padding-top:10px;}
+  /* non-email event row inside related events zone */
+  .re-event-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--line2);margin-top:4px;}
+  .re-event-row .ev-dot{position:static;transform:none;flex:0 0 8px;}
+  .re-event-text{flex:1;font-size:13px;color:var(--ink);}
+  .re-event-stamp{font-size:11.5px;color:var(--helper);text-align:right;white-space:nowrap;line-height:1.5;}
+  /* proposal zone — open, active */
+  .proposal-label{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--helper);margin-bottom:12px;}
+
+  /* ===== SEND EMAIL CARD ===== */
+  /* collapsed bird's-eye */
+  .se-collapsed{display:flex;align-items:center;gap:16px;}
+  .se-meta{font-size:12.5px;color:var(--helper);margin-left:4px;}
+  .se-edit{font-size:12px;color:var(--helper);cursor:pointer;padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;white-space:nowrap;}
+  .se-edit:hover{background:var(--soft);}
+  /* expanded editor */
+  .draft-editor{border-top:1px solid var(--line2);margin-top:14px;padding-top:12px;}
+  .draft-thread-link{font-size:12.5px;color:var(--blue);cursor:pointer;text-decoration:underline;display:inline-block;margin-bottom:12px;}
+  /* recipient pill fields */
+  .recip-field{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:6px 0;border-bottom:1px solid var(--line2);min-height:32px;}
+  .recip-label{flex:0 0 28px;font-size:12px;font-weight:600;color:var(--helper);}
+  .email-pill{display:inline-flex;align-items:center;gap:4px;background:#e8e8e4;border-radius:12px;padding:2px 10px 2px 10px;font-size:12.5px;color:var(--ink);}
+  .email-pill .ep-rm{color:#9a9a95;cursor:pointer;font-size:11px;margin-left:2px;}
+  .recip-input{border:none;outline:none;font-size:13px;font-family:inherit;min-width:80px;background:transparent;color:var(--ink);}
+  /* subject */
+  .subject-field{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line2);}
+  .subject-label{flex:0 0 28px;font-size:12px;font-weight:600;color:var(--helper);}
+  .subject-input{flex:1;border:none;outline:none;font-size:13px;font-family:inherit;color:var(--ink);}
+  .subject-input.greyed{color:var(--helper);cursor:not-allowed;pointer-events:none;}
+  /* body */
+  .draft-body-area{width:100%;border:none;border-bottom:1px solid var(--line2);padding:10px 0;font-size:13px;font-family:inherit;line-height:1.6;resize:none;min-height:192px;outline:none;background:transparent;margin-top:6px;}
+  .draft-tiny{display:flex;gap:12px;font-size:12px;color:var(--helper);justify-content:flex-end;padding:5px 0;}
+  .draft-tiny span{cursor:pointer;} .draft-tiny span:hover{color:var(--ink);}
+  /* attachment row */
+  .attach-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0;}
+  .attach-pill-tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 9px;border:1px solid var(--line);border-radius:5px;color:var(--ink);cursor:pointer;}
+  .attach-pill-tag:hover{background:var(--soft);}
+  .attach-pill-tag .ap-rm{color:var(--helper);font-size:10px;}
+  .attach-add-btn{font-size:12.5px;color:var(--helper);cursor:pointer;padding:3px 8px;border:1px solid var(--line);border-radius:5px;}
+  .attach-add-btn:hover{color:var(--ink);}
+  .attach-picker{position:absolute;z-index:20;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.1);padding:4px 0;min-width:200px;font-size:13px;margin-top:4px;}
+  .attach-picker-item{padding:8px 14px;cursor:pointer;}
   .attach-picker-item:hover{background:var(--soft);}
-  .draft-footer{padding:10px 14px;border-top:1px solid var(--line2);background:#fff;display:flex;justify-content:flex-end;gap:9px;}
+  /* footer */
+  .draft-footer{display:flex;justify-content:flex-end;gap:9px;padding-top:10px;border-top:1px solid var(--line2);margin-top:4px;}
   .badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;}
   .badge.opened{background:#e6f4ea;color:#2d8a4e;}.badge.clicked{background:#e8f0fe;color:#2476d8;}.badge.bounced{background:#fef3e2;color:#b06000;}.badge.failed{background:#fce8e6;color:#a23a1e;}
   /* full-width thread view */
