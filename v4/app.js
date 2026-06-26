@@ -12,6 +12,8 @@ const ICON = {
   x: SV('<circle cx="8" cy="8" r="6.2"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/>'),
   clip: SV('<path d="M12.5 7.5l-5.5 5.5a3.5 3.5 0 01-5-5l6-6a2 2 0 013 3l-5.5 5.5a.5.5 0 01-.7-.7l5-5"/>'),
   user: SV('<circle cx="8" cy="5" r="2.6"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/>'),
+  flagOut: `<svg viewBox="0 0 16 16" width="100%" height="100%"><line x1="3.5" y1="2" x2="3.5" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3.5 2.5 L12.5 5.5 L3.5 9.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+  flagFill: `<svg viewBox="0 0 16 16" width="100%" height="100%"><line x1="3.5" y1="2" x2="3.5" y2="14" stroke="#e8333a" stroke-width="1.5" stroke-linecap="round"/><path d="M3.5 2.5 L12.5 5.5 L3.5 9.5 Z" fill="#e8333a" stroke="#e8333a" stroke-width="1" stroke-linejoin="round"/></svg>`,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -170,6 +172,8 @@ let threadOpenEmails = new Set();
 let expandedHeaders = new Set();
 let showBcc = false;
 let attachPickerOpen = false;
+let agentEscalated = false;
+let agentPaused = false;
 // scheduled tab state
 let editingTask = null;       // task id being edited
 let deletedTasks = new Set(); // task ids deleted this session
@@ -433,6 +437,34 @@ function renderEmailCard(em, opts={}){
 // ============================================================
 //  DRAFT EDITOR
 // ============================================================
+function openComposeModal(){
+  if(!recipientPills["compose"]) recipientPills["compose"]={to:[],cc:[]};
+  const draft={to:"",cc:"",subject:"",body:"",attachments:[]};
+  $("modal").innerHTML=`<div class="scrim" id="composeBg">
+    <div class="modal" style="max-width:600px;padding:0;overflow:hidden;border-radius:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)">
+        <span style="font-size:15px;font-weight:700">Send reminder</span>
+        <button class="btn" id="composeClose" style="padding:4px 10px;font-size:13px">×</button>
+      </div>
+      <div style="padding:16px 18px">${renderDraftEditor(draft,"compose")}</div>
+    </div>
+  </div>`;
+  $("composeClose").onclick=()=>{ $("modal").innerHTML=""; recipientPills["compose"]={to:[],cc:[]}; };
+  $("composeBg").onclick=(e)=>{ if(e.target.id==="composeBg"){ $("modal").innerHTML=""; recipientPills["compose"]={to:[],cc:[]}; } };
+  // re-wire draft interactions inside modal
+  const m=$("modal");
+  m.querySelectorAll("[data-pill-input]").forEach(el=>el.onkeydown=(e)=>{
+    if(e.key===" "||e.key===","||e.key==="Enter"){ e.preventDefault();
+      const val=el.value.trim().replace(/,$/,""); if(!val) return;
+      const [idx,field]=el.dataset.pillInput.split(":");
+      if(!recipientPills[idx]) recipientPills[idx]={to:[],cc:[]};
+      recipientPills[idx][field].push(val); el.value=""; const p=$("panel"); renderPanel(); openComposeModal(); }
+  });
+  m.querySelectorAll("[data-open-picker]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); attachPickerOpen=attachPickerOpen===el.dataset.openPicker?false:el.dataset.openPicker; $("modal").innerHTML=""; openComposeModal(); });
+  m.querySelectorAll("[data-pick-attach]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const [idx,name]=el.dataset.pickAttach.split(":"); if(!selectedAttachments[idx]) selectedAttachments[idx]=new Set(); selectedAttachments[idx].add(name); attachPickerOpen=false; $("modal").innerHTML=""; openComposeModal(); });
+  m.querySelectorAll("[data-rm-attach]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const [idx,name]=el.dataset.rmAttach.split(":"); if(selectedAttachments[idx]) selectedAttachments[idx].delete(name); $("modal").innerHTML=""; openComposeModal(); });
+}
+
 function openEmailHeaderModal(emailId){
   const allEmails = THREADS.flatMap(t=>t.emails);
   const em = allEmails.find(e=>e.id===emailId); if(!em) return;
@@ -564,7 +596,20 @@ function renderDetailHeader(){
       <span class="back" id="backBtn">← ${esc(SCENARIO.customer)}</span>
       <span>›</span> <b>Collections Agent</b>
     </div>
-    <div style="padding:16px 22px 0;font-size:17px;font-weight:700">Collections Agent</div>
+    <div style="padding:14px 22px 6px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:17px;font-weight:700">Collections Agent</span>
+      <div class="top-actions">
+        <button class="btn-icon ${agentEscalated?"flagged":""}" id="flagBtn">
+          <span style="width:16px;height:16px;display:block">${agentEscalated?ICON.flagFill:ICON.flagOut}</span>
+          <span class="icon-tip">${agentEscalated?"Remove escalation flag":"Flag as escalated"}</span>
+        </button>
+        <button class="btn-topbar ${agentPaused?"paused":""}" id="pauseBtn">
+          ${agentPaused?"▶ Resume Agent":"⏸ Pause Agent"}
+          <span class="icon-tip" style="right:0;left:auto">${agentPaused?"Resume: agent will start proposing actions":"Agent won't propose or take any actions on this customer"}</span>
+        </button>
+        <span class="perms-link" style="margin-left:4px">Agent permissions</span>
+      </div>
+    </div>
     <section class="finger">
       <div class="left">
         <div class="agent-summary">
@@ -995,7 +1040,7 @@ function render(){
       view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null;
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
-      openNewEvents=new Set(); recipientPills={};
+      openNewEvents=new Set(); recipientPills={}; agentEscalated=false; agentPaused=false;
       activeTab="actions"; render();
     });
     $("backBtn") && ($("backBtn").onclick=()=>{ view="inbox"; render(); });
@@ -1005,13 +1050,15 @@ function render(){
       view="detail"; actionState={}; editingCard=null; editValues={}; expandedCard=null;
       threadExpanded=false; selectedEmailId=null; threadOpenEmails=new Set();
       expandedHeaders=new Set(); selectedAttachments={}; showBcc=false; attachPickerOpen=false;
-      openNewEvents=new Set(); recipientPills={};
+      openNewEvents=new Set(); recipientPills={}; agentEscalated=false; agentPaused=false;
       activeTab="actions"; render();
     });
   } else {
     main.innerHTML = renderDetailHeader()+`<div class="panel" id="panel"></div>`;
     renderPanel();
     $("backBtn").onclick=()=>{ view="customer"; render(); };
+    $("flagBtn").onclick=()=>{ agentEscalated=!agentEscalated; render(); };
+    $("pauseBtn").onclick=()=>{ agentPaused=!agentPaused; render(); };
     main.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
       if(b.dataset.tab==="settings") return;
       activeTab=b.dataset.tab;
