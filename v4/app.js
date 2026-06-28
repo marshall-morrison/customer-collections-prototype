@@ -117,8 +117,8 @@ const THREADS = [
         body:"Hi Dana,\n\nJust confirming — I've applied PO 12345 to INV-2241 and updated the primary billing contact to ap@meridiangroup.com as requested.\n\nA fresh copy of INV-2241 is attached.\n\nBest,\nGeneral Catalyst Collections",
         attachments:[{name:"INV-2241.pdf",type:"PDF"}], badges:["opened"] },
       // Dunning reminder 1 — Postmark dunning, engagement data available
-      { id:"e2", dir:"out", entity:"dunning",
-        from:{name:"Dunning",email:"billing@generalcatalyst.com"},
+      { id:"e2", dir:"out", entity:"dunning", entityLabel:"Dunning Reminder",
+        from:{name:"Dunning Reminder",email:"billing@generalcatalyst.com"},
         to:[{name:"Dana Reed",email:"finance@meridiangroup.com",badge:"opened"}], cc:[],
         date:"May 25, 2026", time:"8:00 AM",
         body:"Hi Dana,\n\nJust a reminder that invoice INV-2241 for $10,890 is due in one week on Jun 1. Please let us know if you have any questions.\n\nGeneral Catalyst",
@@ -131,8 +131,8 @@ const THREADS = [
         body:"Hi Dana,\n\nJust wanted to follow up personally — let me know if there's anything blocking payment on INV-2241. Happy to hop on a quick call.\n\nPriya",
         attachments:[], badges:[] },
       // Dunning reminder 2 — Postmark dunning, engagement data available
-      { id:"e2b", dir:"out", entity:"dunning",
-        from:{name:"Dunning",email:"billing@generalcatalyst.com"},
+      { id:"e2b", dir:"out", entity:"dunning", entityLabel:"Dunning Reminder",
+        from:{name:"Dunning Reminder",email:"billing@generalcatalyst.com"},
         to:[{name:"Dana Reed",email:"finance@meridiangroup.com",badge:"opened"}], cc:[],
         date:"Jun 2, 2026", time:"8:05 AM",
         body:"Hi Dana,\n\nInvoice INV-2241 for $10,890 was due yesterday and remains unpaid. Please remit at your earliest convenience or reach out if you need assistance.\n\nGeneral Catalyst",
@@ -572,53 +572,94 @@ function openComposeModal(){
   m.querySelectorAll("[data-rm-attach]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const [idx,name]=el.dataset.rmAttach.split(":"); if(selectedAttachments[idx]) selectedAttachments[idx].delete(name); $("modal").innerHTML=""; openComposeModal(); });
 }
 
-function openEmailHeaderModal(emailId){
+function openEmailHeaderModal(emailId, triggerEl){
+  // toggle: close if already open
+  const existing = document.getElementById("hdrDropdown");
+  if(existing){ existing.remove(); document.removeEventListener("click", window._hdrClose); return; }
+
   const allEmails = THREADS.flatMap(t=>t.emails);
   const em = allEmails.find(e=>e.id===emailId); if(!em) return;
-  const chk = v=>`<span style="color:${v?"var(--ink)":"var(--line)"};font-weight:${v?"700":"400"}">${v?"✓":"—"}</span>`;
-  const o = !!(em.badges||[]).includes("opened");
-  const c = !!(em.badges||[]).includes("clicked");
-  const b = !!(em.badges||[]).includes("bounced");
-  const f = !!(em.badges||[]).includes("failed");
-  const recipRows = [...em.to,...(em.cc||[])].map(r=>{
-    const pf = em.to.includes(r)?"To":"CC";
-    return `<tr>
-      <td style="padding:5px 10px 5px 0;color:var(--helper);font-size:12px">${pf}</td>
-      <td style="padding:5px 10px 5px 0;font-size:13px">${esc(r.name||"")} &lt;${esc(r.email)}&gt;</td>
-      <td style="text-align:center;padding:5px 8px">${chk(true)}</td>
-      <td style="text-align:center;padding:5px 8px">${chk(o)}</td>
-      <td style="text-align:center;padding:5px 8px">${chk(c)}</td>
-      <td style="text-align:center;padding:5px 8px">${chk(b)}</td>
-      <td style="text-align:center;padding:5px 8px">${chk(f)}</td>
-    </tr>`;
-  }).join("");
-  $("modal").innerHTML=`<div class="scrim" id="hdrBg">
-    <div class="modal" style="max-width:520px">
-      <div style="display:grid;grid-template-columns:55px 1fr;gap:5px 10px;font-size:13px;margin-bottom:16px">
-        <span style="color:var(--helper);font-weight:600;text-align:right">from</span>
-        <span><strong>${esc(em.from.name)}</strong> &lt;${esc(em.from.email)}&gt;</span>
-        <span style="color:var(--helper);font-weight:600;text-align:right">date</span>
-        <span>${esc(em.date)} · ${esc(em.time)}</span>
-      </div>
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px">
-        <thead><tr>
-          <th style="text-align:left;padding:4px 10px 6px 0;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px"></th>
-          <th style="text-align:left;padding:4px 10px 6px 0;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Recipient</th>
-          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Delivered</th>
-          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Opened</th>
-          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Clicked</th>
-          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Bounced</th>
-          <th style="text-align:center;padding:4px 8px 6px;color:var(--helper);border-bottom:1px solid var(--line2);font-size:11px">Failed</th>
-        </tr></thead>
-        <tbody>${recipRows}</tbody>
-      </table>
-      <div style="display:flex;justify-content:flex-end;margin-top:16px">
-        <button class="btn" id="hdrClose">Close</button>
-      </div>
+
+  // engagement only for outbound system/dunning/agent emails
+  const hasEngagement = ["system","dunning","agent"].includes(em.entity);
+  const chk = v=>`<span style="color:${v?"var(--ink)":"#ccc"};font-size:14px;font-weight:${v?"600":"400"}">${v?"✓":"—"}</span>`;
+
+  let engSection = "";
+  if(hasEngagement){
+    const o = (em.badges||[]).includes("opened");
+    const c = (em.badges||[]).includes("clicked");
+    const b = (em.badges||[]).includes("bounced");
+    const f = (em.badges||[]).includes("failed");
+
+    const recipRows = [...em.to,...(em.cc||[])].map(r=>{
+      const pf = em.to.includes(r)?"To":"CC";
+      return `<tr>
+        <td style="padding:6px 12px 6px 0;color:var(--helper);font-size:12px;white-space:nowrap;vertical-align:middle">${pf}</td>
+        <td style="padding:6px 16px 6px 0;font-size:13px;vertical-align:middle;white-space:nowrap">${esc(r.name||"")} <span style="color:var(--helper)">&lt;${esc(r.email)}&gt;</span></td>
+        <td style="text-align:center;padding:6px 12px;vertical-align:middle">${chk(true)}</td>
+        <td style="text-align:center;padding:6px 12px;vertical-align:middle">${chk(o)}</td>
+        <td style="text-align:center;padding:6px 12px;vertical-align:middle">${chk(c)}</td>
+        <td style="text-align:center;padding:6px 12px;vertical-align:middle">${chk(b)}</td>
+        <td style="text-align:center;padding:6px 12px;vertical-align:middle">${chk(f)}</td>
+      </tr>`;
+    }).join("");
+
+    engSection = `
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <table style="border-collapse:collapse;font-size:12px;width:100%">
+          <thead><tr>
+            <th style="text-align:left;padding:0 12px 8px 0;color:var(--helper);font-weight:500;font-size:11px;white-space:nowrap"></th>
+            <th style="text-align:left;padding:0 16px 8px 0;color:var(--helper);font-weight:500;font-size:11px"></th>
+            <th style="text-align:center;padding:0 12px 8px;color:var(--helper);font-weight:500;font-size:11px">Delivered</th>
+            <th style="text-align:center;padding:0 12px 8px;color:var(--helper);font-weight:500;font-size:11px">Opened</th>
+            <th style="text-align:center;padding:0 12px 8px;color:var(--helper);font-weight:500;font-size:11px">Clicked</th>
+            <th style="text-align:center;padding:0 12px 8px;color:var(--helper);font-weight:500;font-size:11px">Bounced</th>
+            <th style="text-align:center;padding:0 12px 8px;color:var(--helper);font-weight:500;font-size:11px">Failed</th>
+          </tr></thead>
+          <tbody>${recipRows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  const drop = document.createElement("div");
+  drop.id = "hdrDropdown";
+  drop.innerHTML = `
+    <div style="display:grid;grid-template-columns:max-content 1fr;gap:5px 14px;font-size:13px">
+      <span style="color:var(--helper);text-align:right">from:</span>
+      <span><strong>${esc(em.from.name)}</strong> <span style="color:var(--helper)">&lt;${esc(em.from.email)}&gt;</span></span>
+      <span style="color:var(--helper);text-align:right">date:</span>
+      <span style="color:var(--ink)">${esc(em.date)} · ${esc(em.time)}</span>
     </div>
-  </div>`;
-  $("hdrClose").onclick=()=>{ $("modal").innerHTML=""; };
-  $("hdrBg").onclick=(e)=>{ if(e.target.id==="hdrBg") $("modal").innerHTML=""; };
+    ${engSection}
+  `;
+  Object.assign(drop.style, {
+    position:"fixed", zIndex:"200",
+    background:"#fff", borderRadius:"8px",
+    boxShadow:"0 4px 24px rgba(0,0,0,.18), 0 1px 4px rgba(0,0,0,.08)",
+    padding:"16px 18px",
+    fontSize:"13px", whiteSpace:"nowrap"
+  });
+
+  document.body.appendChild(drop);
+
+  // position below the chevron, clamp to viewport
+  const rect = triggerEl.getBoundingClientRect();
+  let left = rect.left;
+  let top = rect.bottom + 6;
+  drop.style.left = "0px"; drop.style.top = "-9999px"; // measure off-screen first
+  const dropW = drop.offsetWidth || 420;
+  if(left + dropW > window.innerWidth - 12) left = window.innerWidth - dropW - 12;
+  if(left < 8) left = 8;
+  drop.style.left = left + "px";
+  drop.style.top = top + "px";
+
+  window._hdrClose = (e)=>{
+    if(!drop.contains(e.target) && e.target!==triggerEl){
+      drop.remove();
+      document.removeEventListener("click", window._hdrClose);
+    }
+  };
+  setTimeout(()=>document.addEventListener("click", window._hdrClose), 0);
 }
 
 function renderDraftEditor(draft, actionIdx){
@@ -775,15 +816,13 @@ function renderNewEventsZone(){
       return `<div class="re-event-row">
         <span class="${item.agent?"ev-bolt":"ev-dot"}">${item.agent?"⚡":""}</span>
         <span class="re-event-text">${item.html||esc(item.text||"")}</span>
-        <span class="re-event-stamp">${esc(item.date)}<br>${esc(item.time||"")}</span>
+        <span class="re-event-stamp">${esc(item.date)} · ${esc(item.time||"")}</span>
       </div>`;
     }
   }).join("");
 
   return `<div class="new-events-zone">
-    <div class="proposal-divider" style="margin-top:0">
-      <span class="pd-label">What happened</span>
-    </div>
+    <div class="wh-label">What happened</div>
     <div class="re-timeline">${items}</div>
   </div>`;
 }
@@ -797,7 +836,8 @@ function renderActionsPanel(){
 
   let html = renderNewEventsZone();
   const n = p.length;
-  html += `<div class="proposal-divider">
+  html += `<div class="zone-connector"></div>
+  <div class="proposal-divider">
     <span class="pd-label">Agent Proposes <span class="pd-count">${n}</span> Action${n!==1?"s":""}</span>
   </div>`;
 
@@ -939,25 +979,12 @@ function renderActivityList(){
       return `<div class="act-row" style="position:relative">
         ${marker}
         <span class="ar-body" style="flex:1;font-size:13px;color:var(--ink)">${item.html||esc(item.text||"")}</span>
-        <span class="ar-datestamp">${esc(item.date)}<br>${esc(item.time||"")}</span>
+        <span class="ar-datestamp">${esc(item.date)} · ${esc(item.time||"")}</span>
       </div>`;
     }
-  });
-  // group consecutive event rows under a timeline wrapper; email rows stay flat
-  let out = "";
-  let i2 = 0;
-  while(i2 < items.length){
-    if(items[i2].type === "email"){
-      out += rows[i2]; i2++;
-    } else {
-      let seg = "";
-      while(i2 < items.length && items[i2].type !== "email"){
-        seg += rows[i2]; i2++;
-      }
-      out += `<div class="act-timeline">${seg}</div>`;
-    }
-  }
-  return `<div class="act-list">${out}</div>`;
+  }).join("");
+  // single continuous timeline — hollow dot on email cards, solid dot/bolt on events
+  return `<div class="act-list"><div class="act-timeline">${rows}</div></div>`;
 }
 
 function renderThreadFull(thread){
@@ -1102,7 +1129,7 @@ function wire(){
   p.querySelectorAll("[data-open-email]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); openThread(el.dataset.openEmail); renderPanel(); });
   p.querySelectorAll("[data-back-activity]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); selectedEmailId=null; threadOpenEmails=new Set(); renderPanel(); });
   p.querySelectorAll("[data-expand-email]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); const id=el.dataset.expandEmail; if(threadOpenEmails.has(id)) threadOpenEmails.delete(id); else threadOpenEmails.add(id); renderPanel(); });
-  p.querySelectorAll("[data-header-modal]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); openEmailHeaderModal(el.dataset.headerModal); });
+  p.querySelectorAll("[data-header-modal]").forEach(el=>el.onclick=(e)=>{ e.stopPropagation(); openEmailHeaderModal(el.dataset.headerModal, el); });
   // pill add on space/comma
   p.querySelectorAll("[data-pill-input]").forEach(el=>el.onkeydown=(e)=>{
     if(e.key===" "||e.key===","||e.key==="Enter"){ e.preventDefault();
